@@ -1,0 +1,13 @@
+# Folders
+
+dist/
+node_modules/
+
+# Files
+
+.env
+package-lock.json
+
+# File extensions
+
+*.log
