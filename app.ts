@@ -28,7 +28,7 @@ connection.once('open', async () => {
 
     const deleted = await Drink.deleteMany({timestamp: date});
 
-    logger.info(`✅ cleared ${deleted.deletedCount} datapoints for ${date.toLocaleString()}`);
+    logger.info(`✅ cleared ${deleted.deletedCount} datapoints for ${new Date(date)}`);
 
     const { data: { venues } } = await axios.get('/v1/venues/en_gb/venues.json');
 
@@ -50,14 +50,20 @@ connection.once('open', async () => {
             }
         } while (!menus);
 
-        const productInserts = []
+        const productsInserted = []
+        const productInsertPromises = []
 
         for (const menu of menus) {
             if (menu.name == 'Drinks') {
                 for (const subMenu of menu.subMenu) {
                     for (const productGroup of subMenu.productGroups) {
                         for (const product of productGroup.products) {
-                            productInserts.push(Drink.findOneAndUpdate(
+                            if(productsInserted.indexOf(product.eposName) > -1)
+                                continue;
+
+                            productsInserted.push(product.eposName);
+
+                            const drink = new Drink(
                                 {
                                     timestamp: date,
                                     name: product.eposName,
@@ -65,24 +71,20 @@ connection.once('open', async () => {
                                         name: venue.name,
                                         id: venue.venueId,
                                     },
-                                },
-                                {
                                     price: product.priceValue,
                                 },
-                                {
-                                    upsert: true,
-                                    new: true,
-                                }
-                            ))
+                            );
+
+                            productInsertPromises.push(drink.save());
                         }
                     }
                 }
             }
         }
 
-        await Promise.all(productInserts);
+        await Promise.all(productInsertPromises);
         
-        logger.info(`✅ Fetched data for ${venue.name}`);
+        logger.info(`✅ Fetched data for ${venue.name} (${venues.findIndex((i: any) => i.venueId === venue.venueId)}/${venues.length})`);
     }
 
     logger.info('✅ Finished scraping data! 🎉');
