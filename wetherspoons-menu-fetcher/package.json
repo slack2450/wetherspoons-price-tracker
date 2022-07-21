@@ -1,0 +1,20 @@
+{
+  "name": "wetherspoons-menu-fetcher",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build": "rm -f dist.zip && tsc && zip dist.zip -r ."
+  },
+  "author": "Joss Bird",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "aws-sdk": "^2.1179.0",
+    "axios": "^0.27.2",
+    "uuid": "^8.3.2"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.101",
+    "@types/uuid": "^8.3.4"
+  }
+}
