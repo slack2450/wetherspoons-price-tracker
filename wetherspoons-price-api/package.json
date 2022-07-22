@@ -1,0 +1,18 @@
+{
+  "name": "wetherspoons-price-api",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build": "rm -rf dist && tsc && cp package.json package-lock.json dist/ && cd dist && npm install --only=prod && rm package.json package-lock.json && zip dist.zip -r ."
+  },
+  "author": "Joss Bird",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.131.0",
+    "@aws-sdk/lib-dynamodb": "^3.131.0"
+  },
+  "devDependencies": {
+    "typescript": "^4.7.4"
+  }
+}
