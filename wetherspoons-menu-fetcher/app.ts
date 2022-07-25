@@ -1,4 +1,4 @@
-import { SNSEvent } from 'aws-lambda';
+import { SQSEvent } from 'aws-lambda';
 
 import axios from 'axios';
 
@@ -12,8 +12,8 @@ const dynamodb = new AWS.DynamoDB({ apiVersion: '2012-08-10' });
 
 const date = (new Date()).setHours(0, 0, 0, 0);
 
-export const handler = async (event: SNSEvent): Promise<void> => {
-    const message = event.Records[0].Sns.Message;
+export const handler = async (event: SQSEvent): Promise<void> => {
+    const message = event.Records[0].body;
     const venue = JSON.parse(message);
 
 
