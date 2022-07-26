@@ -11,6 +11,14 @@ terraform {
   }
 }
 
+variable "aws_access_key" {
+  type = string
+}
+
+variable "aws_secret_key" {
+  type = string
+}
+
 variable "cloudflare_api_key" {
   type = string
 }
@@ -21,11 +29,15 @@ variable "cloudflare_api_email" {
 
 provider "aws" {
   region = "eu-west-2"
+  access_key = var.aws_access_key
+  secret_key = var.aws_secret_key
 }
 
 provider "aws" {
   alias  = "us-east-1"
   region = "us-east-1"
+  access_key = var.aws_access_key
+  secret_key = var.aws_secret_key
 }
 
 provider "cloudflare" {
