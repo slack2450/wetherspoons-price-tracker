@@ -94,6 +94,7 @@ resource "aws_lambda_function" "wetherspoons_price_api" {
   ]
 
   filename                       = "${path.module}/dist/index.zip"
+  source_code_hash               = filebase64sha256("${path.module}/dist/index.zip")
   handler                        = "index.handler"
   memory_size                    = 128
   reserved_concurrent_executions = -1

@@ -9,6 +9,12 @@ terraform {
       version = "3.19.0"
     }
   }
+  cloud {
+    organization = "spoons-cheap"
+    workspaces {
+        name = "wetherspoons-price-tracker"
+    }
+  }
 }
 
 variable "aws_access_key" {

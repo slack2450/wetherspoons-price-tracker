@@ -4,7 +4,7 @@
   "description": "",
   "main": "app.js",
   "scripts": {
-    "build": "webpack --mode production",
+    "build": "webpack --mode production && cd dist && zip index.zip index.js",
     "build:dev": "webpack --mode development"
   },
   "author": "Joss Bird",
