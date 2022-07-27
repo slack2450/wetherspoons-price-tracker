@@ -94,38 +94,38 @@ resource "aws_lambda_function" "wetherspoons_menu_fetcher" {
   }
 }
 
-    resource "aws_cloudwatch_log_group" "wetherspoons_menu_fetcher" {
-    name              = "/aws/lambda/${aws_lambda_function.wetherspoons_menu_fetcher.function_name}"
-    retention_in_days = 7
-    lifecycle {
-        prevent_destroy = false
-    }
-    }
+resource "aws_cloudwatch_log_group" "wetherspoons_menu_fetcher" {
+  name              = "/aws/lambda/${aws_lambda_function.wetherspoons_menu_fetcher.function_name}"
+  retention_in_days = 7
+  lifecycle {
+    prevent_destroy = false
+  }
+}
 
-    resource "aws_iam_policy" "wetherspoons_menu_fetcher" {
-    name = "wetherspoons-menu-fetcher-logging-policy"
-    policy = jsonencode(
+resource "aws_iam_policy" "wetherspoons_menu_fetcher" {
+  name = "wetherspoons-menu-fetcher-logging-policy"
+  policy = jsonencode(
+    {
+      Version = "2012-10-17"
+      Statement = [
         {
-        Version = "2012-10-17"
-        Statement = [
-            {
-            Action = [
-                "logs:CreateLogStream",
-                "logs:PutLogEvents",
-            ]
-            Effect   = "Allow"
-            Resource = "${aws_cloudwatch_log_group.wetherspoons_menu_fetcher.arn}:*"
-            },
-        ]
-        }
-    )
-
+          Action = [
+            "logs:CreateLogStream",
+            "logs:PutLogEvents",
+          ]
+          Effect   = "Allow"
+          Resource = "${aws_cloudwatch_log_group.wetherspoons_menu_fetcher.arn}:*"
+        },
+      ]
     }
+  )
 
-    resource "aws_iam_role_policy_attachment" "wetherspoons_menu_fetcher" {
-    role       = aws_iam_role.wetherspoons_menu_fetcher_role.id
-    policy_arn = aws_iam_policy.wetherspoons_menu_fetcher.arn
-    }
+}
+
+resource "aws_iam_role_policy_attachment" "wetherspoons_menu_fetcher" {
+  role       = aws_iam_role.wetherspoons_menu_fetcher_role.id
+  policy_arn = aws_iam_policy.wetherspoons_menu_fetcher.arn
+}
 
 resource "aws_lambda_event_source_mapping" "sqs_trigger" {
   event_source_arn                   = var.sqs_arn

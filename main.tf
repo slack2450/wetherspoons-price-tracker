@@ -12,7 +12,7 @@ terraform {
   cloud {
     organization = "spoons-cheap"
     workspaces {
-        name = "wetherspoons-price-tracker"
+      name = "wetherspoons-price-tracker"
     }
   }
 }
@@ -34,21 +34,21 @@ variable "cloudflare_api_email" {
 }
 
 provider "aws" {
-  region = "eu-west-2"
+  region     = "eu-west-2"
   access_key = var.aws_access_key
   secret_key = var.aws_secret_key
 }
 
 provider "aws" {
-  alias  = "us-east-1"
-  region = "us-east-1"
+  alias      = "us-east-1"
+  region     = "us-east-1"
   access_key = var.aws_access_key
   secret_key = var.aws_secret_key
 }
 
 provider "cloudflare" {
   api_key = var.cloudflare_api_key
-  email = var.cloudflare_api_email
+  email   = var.cloudflare_api_email
 }
 
 resource "aws_sns_topic" "wetherspoons_pubs" {
@@ -100,9 +100,9 @@ module "wetherspoons_menu_fetcher" {
 }
 
 module "wetherspoons_price_api" {
-  source = "./wetherspoons-price-api"
-  aws_access_key = var.aws_access_key
-  aws_secret_key = var.aws_secret_key
-  cloudflare_api_key = var.cloudflare_api_key
+  source               = "./wetherspoons-price-api"
+  aws_access_key       = var.aws_access_key
+  aws_secret_key       = var.aws_secret_key
+  cloudflare_api_key   = var.cloudflare_api_key
   cloudflare_api_email = var.cloudflare_api_email
 }
