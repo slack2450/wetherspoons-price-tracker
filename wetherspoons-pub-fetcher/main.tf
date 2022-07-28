@@ -90,3 +90,20 @@ resource "aws_iam_role_policy_attachment" "wetherspoons_pub_fetcher" {
   policy_arn = aws_iam_policy.wetherspoons_pub_fetcher.arn
 }
 
+resource "aws_cloudwatch_event_rule" "every_monday" {
+  name                = "every-monday"
+  schedule_expression = "cron(0 6 ? * MON *)"
+}
+
+resource "aws_cloudwatch_event_target" "wetherspoons_pub_fetcher" {
+  rule = aws_cloudwatch_event_rule.every_monday.name
+  arn  = aws_lambda_function.wetherspoons_pub_fetcher.arn
+}
+
+resource "aws_lambda_permission" "wetherspoons_pub_fetcher" {
+  statement_id  = "AllowExecutionFromCloudWatch"
+  action        = "lambda:InvokeFunction"
+  principal     = "events.amazonaws.com"
+  function_name = aws_lambda_function.wetherspoons_pub_fetcher.function_name
+  source_arn    = aws_cloudwatch_event_rule.every_monday.arn
+}
