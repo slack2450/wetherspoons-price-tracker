@@ -1,9 +1,16 @@
-cd wetherspoons-pub-fetcher
+cd ./wetherspoons-pub-fetcher
 npm ci
 npm run build
-cd ../wetherspoons-menu-fetcher
+cd ..
+
+cd ./wetherspoons-menu-fetcher
 npm ci
 npm run build
-cd ../wetherspoons-price-api
+cd ..
+
+cd ./wetherspoons-price-api
+cd ./venueId-productId
 npm ci
 npm run build
+cd ..
+cd ..
