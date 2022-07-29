@@ -100,7 +100,7 @@ module "wetherspoons_menu_fetcher" {
 }
 
 module "wetherspoons_price_api" {
-  source               = "./wetherspoons-price-api"
+  source               = "./wetherspoons-api"
   aws_access_key       = var.aws_access_key
   aws_secret_key       = var.aws_secret_key
   cloudflare_api_key   = var.cloudflare_api_key
