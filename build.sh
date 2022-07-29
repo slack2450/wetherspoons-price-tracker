@@ -8,7 +8,7 @@ npm ci
 npm run build
 cd ..
 
-cd ./wetherspoons-price-api
+cd ./wetherspoons-api
 cd ./venueId-productId
 npm ci
 npm run build
