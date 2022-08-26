@@ -1,0 +1,25 @@
+{
+  "devDependencies": {
+    "pre-commit": "^1.2.2"
+  },
+  "name": "wetherspoons-price-tracker",
+  "description": "This repository contains the code for some AWS Lambda functions to track the price of every drink in every Wetherspoons pub.",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "terraform-format": "terraform fmt -check -recursive ."
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/slack69/wetherspoons-price-tracker.git"
+  },
+  "author": "Joss Bird",
+  "license": "UNLICENSED",
+  "bugs": {
+    "url": "https://github.com/slack69/wetherspoons-price-tracker/issues"
+  },
+  "homepage": "https://github.com/slack69/wetherspoons-price-tracker#readme",
+  "pre-commit": [
+    "terraform-format"
+  ]
+}
