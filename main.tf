@@ -90,9 +90,9 @@ resource "aws_dynamodb_table" "wetherspoons_drinks" {
 }
 
 resource "aws_dynamodb_table" "wetherspoons_pubs" {
-  name = "wetherspoons-pubs"
-  hash_key = "venueId"
-  range_key = "date"
+  name         = "wetherspoons-pubs"
+  hash_key     = "venueId"
+  range_key    = "date"
   billing_mode = "PAY_PER_REQUEST"
 
   attribute {
