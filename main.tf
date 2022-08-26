@@ -89,6 +89,23 @@ resource "aws_dynamodb_table" "wetherspoons_drinks" {
   }
 }
 
+resource "aws_dynamodb_table" "wetherspoons_pubs" {
+  name = "wetherspoons-pubs"
+  hash_key = "venueId"
+  range_key = "date"
+  billing_mode = "PAY_PER_REQUEST"
+
+  attribute {
+    name = "venueId"
+    type = "N"
+  }
+
+  attribute {
+    name = "date"
+    type = "N"
+  }
+}
+
 module "wetherspoons_pub_fetcher" {
   source        = "./wetherspoons-pub-fetcher"
   sns_topic_arn = aws_sns_topic.wetherspoons_pubs.arn
