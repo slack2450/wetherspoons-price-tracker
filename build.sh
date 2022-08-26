@@ -14,7 +14,7 @@ cd ..
 
 # wetherspoons-api
 cd ./wetherspoons-api
-cd ./venueId-productId
+cd ./venueId
 npm ci
 npm run build
 cd ..
