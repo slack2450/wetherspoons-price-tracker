@@ -13,24 +13,14 @@ import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 const ddbClient = new DynamoDBClient({ region: 'eu-west-2' });
 
 import { DynamoDBDocumentClient, PutCommand } from '@aws-sdk/lib-dynamodb';
+import { Menu, Venue } from './types';
 const ddbDocClient = DynamoDBDocumentClient.from(ddbClient);
 
 const date = new Date().setHours(0, 0, 0, 0);
 
 const TableName = 'wetherspoons-pubs';
 
-interface Drink {
-    name: string;
-    productId: number;
-    price: number;
-    units: number;
-}
-
-interface Venue {
-    venueId: number;
-    date: number;
-    drinks: Drink[];
-}
+const regex = /ABV, (...) unit/;
 
 export const handler = async (event: SQSEvent): Promise<void> => {
     for (const record of event.Records) {
@@ -39,7 +29,7 @@ export const handler = async (event: SQSEvent): Promise<void> => {
 
         const {
             data: { menus },
-        } = await axios.get(`/content/v3/menus/${inputData.venueId}.json`);
+        } : { data: { menus: Menu[] }} = await axios.get(`/content/v3/menus/${inputData.venueId}.json`);
 
         const productsInserted: number[] = [];
 
@@ -58,8 +48,9 @@ export const handler = async (event: SQSEvent): Promise<void> => {
                         if (productsInserted.indexOf(product.productId) > -1)
                             continue;
 
-                        const regex = /ABV, (...) unit/;
-                        const matches = product.description.matches(regex);
+                        const matches = product.description.match(regex);
+                        if(!matches)
+                            continue;
                         const units = parseFloat(matches[1]);
 
                         productsInserted.push(product.productId);
