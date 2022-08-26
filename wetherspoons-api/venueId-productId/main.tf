@@ -30,7 +30,7 @@ data "aws_region" "current" {}
 data "aws_caller_identity" "current" {}
 
 resource "aws_iam_role" "api_role" {
-  name = "wetherspoons-api-venuidId-productId-role"
+  name = "wetherspoons-api-venuidId-role"
 
   assume_role_policy = jsonencode(
     {
@@ -67,7 +67,7 @@ resource "aws_iam_role" "api_role" {
 
 resource "aws_lambda_function" "wetherspoons_price_api" {
 
-  function_name = "wetherspoons-api-venueId-productId"
+  function_name = "wetherspoons-api-venueId"
 
   architectures = [
     "arm64",
@@ -129,7 +129,7 @@ resource "aws_apigatewayv2_integration" "integration" {
 
 resource "aws_apigatewayv2_route" "wetherspoons_api_price_route" {
   api_id    = var.api_id
-  route_key = "GET /v1/price/{venueId}/{productId}"
+  route_key = "GET /v1/price/{venueId}"
   target    = "integrations/${aws_apigatewayv2_integration.integration.id}"
 }
 
@@ -137,5 +137,5 @@ resource "aws_lambda_permission" "wetherspoons_api_price_route_permission" {
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.wetherspoons_price_api.function_name
   principal     = "apigateway.amazonaws.com"
-  source_arn    = "arn:aws:execute-api:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:${var.api_id}/*/*/v1/price/{venueId}/{productId}"
+  source_arn    = "arn:aws:execute-api:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:${var.api_id}/*/*/v1/price/{venueId}"
 }

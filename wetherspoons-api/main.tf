@@ -218,8 +218,8 @@ resource "cloudflare_record" "www_spoons_cheap" {
   type    = "CNAME"
 }
 
-module "venueId_productId" {
-  source         = "./venueId-productId"
+module "venueId" {
+  source         = "./venueId"
   aws_access_key = var.aws_access_key
   aws_secret_key = var.aws_secret_key
   api_id         = aws_apigatewayv2_api.wetherspoons_api.id

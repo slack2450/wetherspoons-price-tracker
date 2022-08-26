@@ -9,16 +9,17 @@ const ddbClient = new DynamoDBClient({ region: 'eu-west-2' });
 import { DynamoDBDocumentClient, QueryCommand } from "@aws-sdk/lib-dynamodb";
 const ddbDocClient = DynamoDBDocumentClient.from(ddbClient);
 
+const TableName = 'wetherspoons-pubs';
+
 export const handler = async (event: any) => {
     const query = new QueryCommand({
-        TableName: 'wetherspoons-drinks',
-        IndexName: 'venueIdProductId-index',
+        TableName,
         KeyConditionExpression: '#i = :k',
         ExpressionAttributeValues: {
-            ':k': `${event.pathParameters.venueId}-${event.pathParameters.productId}`,
+            ':k': Number(event.pathParameters.venueId),
         },
         ExpressionAttributeNames: {
-            '#i': 'venueIdProductId',
+            '#i': 'venueId',
         }
     });
 
