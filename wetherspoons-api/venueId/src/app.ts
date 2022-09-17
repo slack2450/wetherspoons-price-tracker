@@ -11,15 +11,17 @@ const ddbDocClient = DynamoDBDocumentClient.from(ddbClient);
 
 const TableName = 'wetherspoons-pubs';
 
+const date: number = new Date().setHours(0, 0, 0, 0);
+
 export const handler = async (event: any) => {
     const query = new QueryCommand({
         TableName,
         KeyConditionExpression: '#i = :k',
         ExpressionAttributeValues: {
-            ':k': Number(event.pathParameters.venueId),
+            ':k': date,
         },
         ExpressionAttributeNames: {
-            '#i': 'venueId',
+            '#i': 'date',
         }
     });
 

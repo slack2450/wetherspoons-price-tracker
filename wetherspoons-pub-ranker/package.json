@@ -1,0 +1,14 @@
+{
+  "name": "wetherspoons-pub-ranker",
+  "version": "1.0.0",
+  "description": "",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Joss Bird",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@aws-sdk/lib-dynamodb": "^3.165.0"
+  }
+}

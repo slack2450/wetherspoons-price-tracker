@@ -30,7 +30,7 @@ data "aws_region" "current" {}
 data "aws_caller_identity" "current" {}
 
 resource "aws_iam_role" "api_role" {
-  name = "wetherspoons-api-venuidId-role"
+  name = "wetherspoons-api-venueId-role"
 
   assume_role_policy = jsonencode(
     {
