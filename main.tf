@@ -104,11 +104,32 @@ resource "aws_dynamodb_table" "wetherspoons_pubs" {
     name = "date"
     type = "N"
   }
+
+  global_secondary_index {
+    hash_key        = "date"
+    name            = "DateIndex"
+    projection_type = "ALL"
+  }
+}
+
+resource "aws_dynamodb_table" "wetherspoons_pub_rankings" {
+  name         = "wetherspoons-pub-rankings"
+  hash_key     = "date"
+  billing_mode = "PAY_PER_REQUEST"
+
+  attribute {
+    name = "date"
+    type = "N"
+  }
 }
 
 module "wetherspoons_pub_fetcher" {
   source        = "./wetherspoons-pub-fetcher"
   sns_topic_arn = aws_sns_topic.wetherspoons_pubs.arn
+}
+
+module "wetherspoons_pub_ranker" {
+  source = "./wetherspoons-pub-ranker"
 }
 
 module "wetherspoons_menu_fetcher" {

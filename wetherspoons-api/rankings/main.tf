@@ -30,7 +30,7 @@ data "aws_region" "current" {}
 data "aws_caller_identity" "current" {}
 
 resource "aws_iam_role" "api_role" {
-  name = "wetherspoons-api-venueId-role"
+  name = "wetherspoons-api-rankings-role"
 
   assume_role_policy = jsonencode(
     {
@@ -65,9 +65,9 @@ resource "aws_iam_role" "api_role" {
   }
 }
 
-resource "aws_lambda_function" "wetherspoons_price_api" {
+resource "aws_lambda_function" "wetherspoons_rankings_api" {
 
-  function_name = "wetherspoons-api-venueId"
+  function_name = "wetherspoons-api-rankings"
 
   architectures = [
     "arm64",
@@ -87,16 +87,16 @@ resource "aws_lambda_function" "wetherspoons_price_api" {
   }
 }
 
-resource "aws_cloudwatch_log_group" "wetherspoons_price_api" {
-  name              = "/aws/lambda/${aws_lambda_function.wetherspoons_price_api.function_name}"
+resource "aws_cloudwatch_log_group" "wetherspoons_rankings_api" {
+  name              = "/aws/lambda/${aws_lambda_function.wetherspoons_rankings_api.function_name}"
   retention_in_days = 7
   lifecycle {
     prevent_destroy = false
   }
 }
 
-resource "aws_iam_policy" "wetherspoons_price_api" {
-  name = "wetherspoons-price-api-logging-policy"
+resource "aws_iam_policy" "wetherspoons_rankings_api" {
+  name = "wetherspoons-rankings-api-logging-policy"
   policy = jsonencode(
     {
       Version = "2012-10-17"
@@ -107,7 +107,7 @@ resource "aws_iam_policy" "wetherspoons_price_api" {
             "logs:PutLogEvents",
           ]
           Effect   = "Allow"
-          Resource = "${aws_cloudwatch_log_group.wetherspoons_price_api.arn}:*"
+          Resource = "${aws_cloudwatch_log_group.wetherspoons_rankings_api.arn}:*"
         },
       ]
     }
@@ -115,27 +115,27 @@ resource "aws_iam_policy" "wetherspoons_price_api" {
 
 }
 
-resource "aws_iam_role_policy_attachment" "wetherspoons_price_api" {
+resource "aws_iam_role_policy_attachment" "wetherspoons_rankings_api" {
   role       = aws_iam_role.api_role.id
-  policy_arn = aws_iam_policy.wetherspoons_price_api.arn
+  policy_arn = aws_iam_policy.wetherspoons_rankings_api.arn
 }
 
 resource "aws_apigatewayv2_integration" "integration" {
   integration_type       = "AWS_PROXY"
   payload_format_version = "2.0"
   api_id                 = var.api_id
-  integration_uri        = aws_lambda_function.wetherspoons_price_api.arn
+  integration_uri        = aws_lambda_function.wetherspoons_rankings_api.arn
 }
 
-resource "aws_apigatewayv2_route" "wetherspoons_api_price_route" {
+resource "aws_apigatewayv2_route" "wetherspoons_api_rankings_route" {
   api_id    = var.api_id
-  route_key = "GET /v1/price/{venueId}"
+  route_key = "GET /v1/rankings"
   target    = "integrations/${aws_apigatewayv2_integration.integration.id}"
 }
 
-resource "aws_lambda_permission" "wetherspoons_api_price_route_permission" {
+resource "aws_lambda_permission" "wetherspoons_api_rankings_route_permission" {
   action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.wetherspoons_price_api.function_name
+  function_name = aws_lambda_function.wetherspoons_rankings_api.function_name
   principal     = "apigateway.amazonaws.com"
-  source_arn    = "arn:aws:execute-api:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:${var.api_id}/*/*/v1/price/{venueId}"
+  source_arn    = "arn:aws:execute-api:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:${var.api_id}/*/*/v1/rankings"
 }

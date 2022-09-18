@@ -18,4 +18,14 @@ cd ./venueId
 npm ci
 npm run build
 cd ..
+cd ./rankings
+npm ci
+npm run build
+cd ..
+cd ..
+
+# wetherspoons-pub-ranker
+cd ./wetherspoons-pub-ranker
+npm ci
+npm run build
 cd ..

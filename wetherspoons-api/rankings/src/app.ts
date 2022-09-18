@@ -9,32 +9,22 @@ const ddbClient = new DynamoDBClient({ region: 'eu-west-2' });
 import { DynamoDBDocumentClient, ScanCommand, ScanCommandInput } from "@aws-sdk/lib-dynamodb";
 const ddbDocClient = DynamoDBDocumentClient.from(ddbClient);
 
-const TableName = 'wetherspoons-pubs';
+const TableName = 'wetherspoons-pub-rankings';
 
-const date: number = new Date().setHours(0, 0, 0, 0);
-
-export const handler = async (event: any) => {
-
+export const handler = async () => {
     const params: ScanCommandInput = {
-        TableName,
-        FilterExpression: '#i = :k',
-        ExpressionAttributeValues: {
-            ':k': Number(event.pathParameters.venueId),
-        },
-        ExpressionAttributeNames: {
-            '#i': 'venueId',
-        }
+        TableName
     }
 
-    const prices: any[] = [];
+    const rankings: any[] = [];
 
     do {
         const { Items, LastEvaluatedKey} = await ddbDocClient.send(new ScanCommand(params));
         params.ExclusiveStartKey = LastEvaluatedKey;
         if(Items) {
-            prices.push(...Items);
+            rankings.push(...Items);
         }
     } while(typeof params.ExclusiveStartKey != "undefined");
 
-    return prices;
+    return rankings;
 }
