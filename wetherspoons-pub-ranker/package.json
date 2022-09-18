@@ -10,7 +10,9 @@
   "author": "Joss Bird",
   "license": "UNLICENSED",
   "dependencies": {
-    "@aws-sdk/lib-dynamodb": "^3.165.0"
+    "@aws-sdk/lib-dynamodb": "^3.165.0",
+    "lodash": "^4.17.21",
+    "simple-statistics": "^7.7.6"
   },
   "devDependencies": {
     "@babel/core": "^7.18.9",
