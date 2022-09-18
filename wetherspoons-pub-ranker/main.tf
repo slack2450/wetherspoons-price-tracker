@@ -86,8 +86,8 @@ resource "aws_sns_topic" "wetherspoons_pub_ranker" {
 }
 
 resource "aws_sns_topic_subscription" "sns_subscription" {
-  endpoint = aws_lambda_function.wetherspoons_pub_ranker.arn
-  protocol = "lambda"
+  endpoint  = aws_lambda_function.wetherspoons_pub_ranker.arn
+  protocol  = "lambda"
   topic_arn = aws_sns_topic.wetherspoons_pub_ranker.arn
 }
 
@@ -106,53 +106,53 @@ resource "aws_iam_role_policy_attachment" "wetherspoons_pub_ranker" {
 }
 
 resource "aws_cloudwatch_metric_alarm" "approx_messages_visible_alarm" {
-    actions_enabled           = true
-    alarm_actions             = []
-    alarm_name                = "ApproximateNumberOfMessagesVisible"
-    comparison_operator       = "LessThanThreshold"
-    datapoints_to_alarm       = 1
-    dimensions                = {
-        "QueueName" = "wetherspoons-queue"
-    }
-    evaluation_periods        = 1
-    insufficient_data_actions = []
-    metric_name               = "ApproximateNumberOfMessagesVisible"
-    namespace                 = "AWS/SQS"
-    ok_actions                = []
-    period                    = 900
-    statistic                 = "Sum"
-    tags                      = {}
-    threshold                 = 1
-    treat_missing_data        = "missing"
+  actions_enabled     = true
+  alarm_actions       = []
+  alarm_name          = "ApproximateNumberOfMessagesVisible"
+  comparison_operator = "LessThanThreshold"
+  datapoints_to_alarm = 1
+  dimensions = {
+    "QueueName" = "wetherspoons-queue"
+  }
+  evaluation_periods        = 1
+  insufficient_data_actions = []
+  metric_name               = "ApproximateNumberOfMessagesVisible"
+  namespace                 = "AWS/SQS"
+  ok_actions                = []
+  period                    = 900
+  statistic                 = "Sum"
+  tags                      = {}
+  threshold                 = 1
+  treat_missing_data        = "missing"
 }
 
 resource "aws_cloudwatch_metric_alarm" "approx_messages_not_visible_alarm" {
-    actions_enabled           = true
-    alarm_actions             = []
-    alarm_name                = "ApproximateNumberOfMessagesNotVisible"
-    comparison_operator       = "LessThanThreshold"
-    datapoints_to_alarm       = 1
-    dimensions                = {
-        "QueueName" = "wetherspoons-queue"
-    }
-    evaluation_periods        = 1
-    insufficient_data_actions = []
-    metric_name               = "ApproximateNumberOfMessagesNotVisible"
-    namespace                 = "AWS/SQS"
-    ok_actions                = []
-    period                    = 900
-    statistic                 = "Sum"
-    tags                      = {}
-    threshold                 = 1
-    treat_missing_data        = "missing"
+  actions_enabled     = true
+  alarm_actions       = []
+  alarm_name          = "ApproximateNumberOfMessagesNotVisible"
+  comparison_operator = "LessThanThreshold"
+  datapoints_to_alarm = 1
+  dimensions = {
+    "QueueName" = "wetherspoons-queue"
+  }
+  evaluation_periods        = 1
+  insufficient_data_actions = []
+  metric_name               = "ApproximateNumberOfMessagesNotVisible"
+  namespace                 = "AWS/SQS"
+  ok_actions                = []
+  period                    = 900
+  statistic                 = "Sum"
+  tags                      = {}
+  threshold                 = 1
+  treat_missing_data        = "missing"
 }
 
 resource "aws_cloudwatch_composite_alarm" "queue_empty" {
-    actions_enabled           = true
-    alarm_actions             = [aws_sns_topic.wetherspoons_pub_ranker.arn]
-    alarm_name                = "Queue Empty"
-    alarm_rule                = "ALARM(\"ApproximateNumberOfMessagesVisible\") AND ALARM(\"ApproximateNumberOfMessagesNotVisible\")"
-    insufficient_data_actions = []
-    ok_actions                = []
-    tags                      = {}
+  actions_enabled           = true
+  alarm_actions             = [aws_sns_topic.wetherspoons_pub_ranker.arn]
+  alarm_name                = "Queue Empty"
+  alarm_rule                = "ALARM(\"ApproximateNumberOfMessagesVisible\") AND ALARM(\"ApproximateNumberOfMessagesNotVisible\")"
+  insufficient_data_actions = []
+  ok_actions                = []
+  tags                      = {}
 }

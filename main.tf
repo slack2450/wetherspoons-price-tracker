@@ -106,8 +106,8 @@ resource "aws_dynamodb_table" "wetherspoons_pubs" {
   }
 
   global_secondary_index {
-    hash_key = "date"
-    name = "DateIndex"
+    hash_key        = "date"
+    name            = "DateIndex"
     projection_type = "ALL"
   }
 }
@@ -129,7 +129,7 @@ module "wetherspoons_pub_fetcher" {
 }
 
 module "wetherspoons_pub_ranker" {
-  source        = "./wetherspoons-pub-ranker"
+  source = "./wetherspoons-pub-ranker"
 }
 
 module "wetherspoons_menu_fetcher" {
