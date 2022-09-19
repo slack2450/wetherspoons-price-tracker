@@ -7,7 +7,7 @@ import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 // Create an Amazon DynamoDB service client object.
 const ddbClient = new DynamoDBClient({ region: 'eu-west-2' });
 
-import { DynamoDBDocumentClient, PutCommand, ScanCommand, ScanCommandInput } from "@aws-sdk/lib-dynamodb";
+import { DynamoDBDocumentClient, PutCommand, QueryCommand, QueryCommandInput } from "@aws-sdk/lib-dynamodb";
 const ddbDocClient = DynamoDBDocumentClient.from(ddbClient);
 
 interface Drink {
@@ -33,10 +33,10 @@ export const handler = async() => {
 
     const pubs: Pub[] = [];
 
-    const params: ScanCommandInput = {
+    const params: QueryCommandInput = {
         TableName: 'wetherspoons-pubs',
         IndexName: 'DateIndex',
-        FilterExpression: '#i = :k',
+        KeyConditionExpression: '#i = :k',
         ExpressionAttributeValues: {
             ':k': date,
         },
@@ -46,7 +46,7 @@ export const handler = async() => {
     }
 
     do {
-        const { Items, LastEvaluatedKey} = await ddbDocClient.send(new ScanCommand(params));
+        const { Items, LastEvaluatedKey} = await ddbDocClient.send(new QueryCommand(params));
         params.ExclusiveStartKey = LastEvaluatedKey;
         if(Items) {
             pubs.push(...Items as Pub[]);
@@ -75,9 +75,13 @@ export const handler = async() => {
         pub.mahld = NaN;
     }
 
-    const vspirit   = pubs.map((pub) => pub.spiritAvgPPU);
-    const vbeer     = pubs.map((pub) => pub.beerAvgPPU);
-    const vwine     = pubs.map((pub) => pub.wineAvgPPU);
+    const rankablePubs: Pub[] = pubs.filter(pub => {
+        return pub.wineAvgPPU > 0 && pub.spiritAvgPPU > 0 && pub.beerAvgPPU > 0
+    });
+
+    const vspirit   = rankablePubs.map((pub) => pub.spiritAvgPPU);
+    const vbeer     = rankablePubs.map((pub) => pub.beerAvgPPU);
+    const vwine     = rankablePubs.map((pub) => pub.wineAvgPPU);
 
     const mvector = [mean(vspirit), mean(vbeer), mean(vwine)];
     const vmatrix = [
@@ -97,24 +101,18 @@ export const handler = async() => {
     const h = (-1/det)*(vmatrix[0][0]*vmatrix[2][1] - vmatrix[0][1]*vmatrix[2][0])
     const i = (1/det)*(vmatrix[0][0]*vmatrix[1][1] - vmatrix[0][1]*vmatrix[1][0])
 
-    for(const pub of pubs) {
-        if(pub.wineAvgPPU <= 0 || pub.spiritAvgPPU <= 0 || pub.beerAvgPPU <= 0) {
-            continue;
-        }
-            
+    for(const pub of rankablePubs) {
         const euclid = [pub.spiritAvgPPU + -1*mvector[0],pub.beerAvgPPU + -1*mvector[1],pub.wineAvgPPU + -1*mvector[2]];
         const spread = [a*euclid[0] + b*euclid[1] + c*euclid[2], d*euclid[0] + e*euclid[1] + f*euclid[2], g*euclid[0] + h*euclid[1] + i*euclid[2]]
         const malhsquared = euclid[0]*spread[0] + euclid[1]*spread[1] + euclid[2]*spread[2];
         pub.mahld = Math.sqrt(malhsquared);
     }
 
-    const rankablePubs: Pub[] = pubs.filter(pub => !Number.isNaN(pub.mahld));
-
     rankablePubs.sort((a, b) => b.mahld - a.mahld);
 
-    let brank = pubs.length;
+    let brank = rankablePubs.length;
     let trank = 1;
-    for(const pub of pubs) {
+    for(const pub of rankablePubs) {
         //console.log(pub.spiritAvgPPU + -1*mvector[0] +pub.beerAvgPPU + -1*mvector[1] +pub.wineAvgPPU + -1*mvector[2]);
         if(pub.spiritAvgPPU + -1*mvector[0] +pub.beerAvgPPU + -1*mvector[1] +pub.wineAvgPPU + -1*mvector[2] < 0) {
             pub.rank = trank;
@@ -125,7 +123,7 @@ export const handler = async() => {
         }
     }
 
-    pubs.sort((a, b) => a.rank - b.rank);
+    rankablePubs.sort((a, b) => a.rank - b.rank);
 
     const pubDBData = rankablePubs.map((pub) => {
         return {
