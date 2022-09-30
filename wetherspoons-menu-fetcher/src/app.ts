@@ -20,7 +20,9 @@ const date = new Date().setHours(0, 0, 0, 0);
 
 const TableName = 'wetherspoons-pubs';
 
-const regex = /ABV, (...) unit/;
+const beerRegex = /ABV, (...) unit/;
+const wineRegex = /(\d?\d?\.?\d%) ABV/;
+const volumeRegex = /(\d?\d\d)ml/;
 
 export const handler = async (event: SQSEvent): Promise<void> => {
     for (const record of event.Records) {
@@ -48,19 +50,62 @@ export const handler = async (event: SQSEvent): Promise<void> => {
                         if (productsInserted.indexOf(product.productId) > -1)
                             continue;
 
-                        const matches = product.description.match(regex);
-                        if(!matches)
-                            continue;
-                        const units = parseFloat(matches[1]);
+                        const beerMatches = product.description.match(beerRegex);
+                        const wineMatches = product.description.match(wineRegex);
 
-                        productsInserted.push(product.productId);
+                        if(beerMatches) {
+                            const units = parseFloat(beerMatches[1]);
 
-                        venue.drinks.push({
-                            name: product.eposName,
-                            productId: product.productId,
-                            price: product.priceValue,
-                            units,
-                        });
+                            productsInserted.push(product.productId);
+
+                            venue.drinks.push({
+                                name: product.eposName,
+                                productId: product.productId,
+                                price: product.priceValue,
+                                units,
+                            });
+                        } else if (wineMatches) {
+                            const descriptionVol = product.description.match(volumeRegex);
+                            const percentage = parseFloat(wineMatches[1]);
+
+                            if (descriptionVol) {
+                                const units = (percentage * parseFloat(descriptionVol[1])) / 1000;
+
+                                venue.drinks.push({
+                                    name: product.eposName,
+                                    productId: product.productId,
+                                    price: product.priceValue,
+                                    units,
+                                })
+                            } else {
+                                if (product.defaultPortionName) {
+                                    const volume = product.defaultPortionName.match(volumeRegex);
+                      
+                                    if(!volume)
+                                        continue;
+
+                                    const units = (percentage * parseFloat(volume[1])) / 1000;
+                      
+                                    venue.drinks.push({
+                                        name: product.eposName,
+                                        productId: product.productId,
+                                        price: product.priceValue,
+                                        units,
+                                    })
+                                  } else {
+                                    const volume = 175; // Assume medium glass of wine
+                      
+                                    const units = (percentage * volume) / 1000;
+                      
+                                    venue.drinks.push({
+                                        name: product.eposName,
+                                        productId: product.productId,
+                                        price: product.priceValue,
+                                        units,
+                                    })
+                                  }
+                            }
+                        }
                     }
                 }
             }

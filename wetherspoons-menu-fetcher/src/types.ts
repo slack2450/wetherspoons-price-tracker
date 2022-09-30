@@ -16,6 +16,7 @@ interface Product {
     productId: number;
     description: string;
     priceValue: number;
+    defaultPortionName?: string;
 }
 
 interface ProductGroup {

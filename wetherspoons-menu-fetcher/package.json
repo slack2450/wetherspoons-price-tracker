@@ -10,6 +10,7 @@
   "author": "Joss Bird",
   "license": "UNLICENSED",
   "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.181.0",
     "@aws-sdk/lib-dynamodb": "^3.131.0",
     "axios": "^0.27.2",
     "uuid": "^8.3.2"

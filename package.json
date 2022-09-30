@@ -23,8 +23,5 @@
     "terraform-format"
   ],
   "dependencies": {
-    "@aws-sdk/client-dynamodb": "^3.172.0",
-    "lodash": "^4.17.21",
-    "simple-statistics": "^7.7.6"
   }
 }
