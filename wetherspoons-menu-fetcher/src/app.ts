@@ -71,6 +71,8 @@ export const handler = async (event: SQSEvent): Promise<void> => {
                             if (descriptionVol) {
                                 const units = (percentage * parseFloat(descriptionVol[1])) / 1000;
 
+                                productsInserted.push(product.productId);
+
                                 venue.drinks.push({
                                     name: product.eposName,
                                     productId: product.productId,
@@ -85,6 +87,8 @@ export const handler = async (event: SQSEvent): Promise<void> => {
                                         continue;
 
                                     const units = (percentage * parseFloat(volume[1])) / 1000;
+
+                                    productsInserted.push(product.productId);
                       
                                     venue.drinks.push({
                                         name: product.eposName,
@@ -96,6 +100,8 @@ export const handler = async (event: SQSEvent): Promise<void> => {
                                     const volume = 175; // Assume medium glass of wine
                       
                                     const units = (percentage * volume) / 1000;
+
+                                    productsInserted.push(product.productId);
                       
                                     venue.drinks.push({
                                         name: product.eposName,
