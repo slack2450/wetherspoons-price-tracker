@@ -21,7 +21,7 @@ const date = new Date().setHours(0, 0, 0, 0);
 const TableName = 'wetherspoons-pubs';
 
 const beerRegex = /ABV, (...) unit/;
-const wineRegex = /(\d?\d?\.?\d%) ABV/;
+const wineRegex = /(\d?\d?\.?\d?\d%) ABV/;
 const volumeRegex = /(\d?\d\d)ml/;
 
 export const handler = async (event: SQSEvent): Promise<void> => {
