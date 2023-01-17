@@ -1,1 +1,2 @@
 *.tcl linguist-detectable=false
+*.tf linguist-detectable=false
