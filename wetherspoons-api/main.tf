@@ -67,6 +67,10 @@ resource "aws_apigatewayv2_stage" "wetherspoons_api_stage" {
   api_id      = aws_apigatewayv2_api.wetherspoons_api.id
   name        = "$default"
   auto_deploy = true
+  default_route_settings {
+    throttling_burst_limit = 5000
+    throttling_rate_limit = 5000
+  }
 }
 
 resource "aws_cloudfront_cache_policy" "wetherspoons_api_cache" {
