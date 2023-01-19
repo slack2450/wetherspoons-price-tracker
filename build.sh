@@ -14,6 +14,10 @@ cd ..
 
 # wetherspoons-api
 cd ./wetherspoons-api
+cd ./proxy
+npm ci
+npm run build
+cd ..
 cd ./venueId
 npm ci
 npm run build
