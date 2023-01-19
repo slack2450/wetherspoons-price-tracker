@@ -8,7 +8,13 @@ export const handler = async (event: APIGatewayEvent ) => {
     if(!event.pathParameters)
         return;
 
-    const response = await axios.get(`/${event.pathParameters.proxy}`);
+    try {
+        const response = await axios.get(`/${event.pathParameters.proxy}`);
+        return response.data;
+    } catch (error) {
+        return '';
+    }
     
-    return response.data;
+    
+    
 }

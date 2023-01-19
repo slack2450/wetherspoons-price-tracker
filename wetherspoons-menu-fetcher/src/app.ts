@@ -31,7 +31,7 @@ export const handler = async (event: SQSEvent): Promise<void> => {
 
         const {
             data: { menus },
-        } : { data: { menus: Menu[] }} = await axios.get(`/content/v3/menus/${inputData.venueId}.json`);
+        } : { data: { menus: Menu[] }} = await axios.get(`/content/v8/menus/${inputData.venueId}.json`);
 
         const productsInserted: number[] = [];
 
