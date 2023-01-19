@@ -11,12 +11,18 @@ export interface Venue {
     drinks: Drink[];
 }
 
+interface Portion {
+    name: string;
+    price: number;
+}
+
 interface Product {
     eposName: string;
     productId: number;
     description: string;
-    priceValue: number;
+    displayPrice: string;
     defaultPortionName?: string;
+    portions?: Portion[];
 }
 
 interface ProductGroup {

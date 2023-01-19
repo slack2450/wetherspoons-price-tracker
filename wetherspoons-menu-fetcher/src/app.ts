@@ -53,6 +53,10 @@ export const handler = async (event: SQSEvent): Promise<void> => {
                         const beerMatches = product.description.match(beerRegex);
                         const wineMatches = product.description.match(wineRegex);
 
+                        // Sometimes priceValue != displayPrice
+                        // displayPrice is the accurate one
+                        let price = parseFloat(product.displayPrice.slice(1));
+
                         if(beerMatches) {
                             const units = parseFloat(beerMatches[1]);
 
@@ -61,22 +65,45 @@ export const handler = async (event: SQSEvent): Promise<void> => {
                             venue.drinks.push({
                                 name: product.eposName,
                                 productId: product.productId,
-                                price: product.priceValue,
+                                price: price,
                                 units,
                             });
                         } else if (wineMatches) {
-                            const descriptionVol = product.description.match(volumeRegex);
+
+                            let volume = 0;
+
+                            if(product.portions) {
+                                for(const portion of product.portions) {
+                                    const match = portion.name.match(volumeRegex);
+                                    if(!match) continue;
+
+                                    const portionSize = parseFloat(match[1]);
+                                    if(portionSize < volume) continue;
+                                    
+                                    volume = portionSize;
+                                    price = portion.price;
+                                }
+                            }
+
+                            if(volume === 0) {
+                                const match = product.description.match(volumeRegex);
+                                if(match) {
+                                    volume = parseFloat(match[1]);
+                                    price = parseFloat(product.displayPrice.slice(1));
+                                }
+                            }
+
                             const percentage = parseFloat(wineMatches[1]);
 
-                            if (descriptionVol) {
-                                const units = (percentage * parseFloat(descriptionVol[1])) / 1000;
+                            if (volume > 0) {
+                                const units = (percentage * volume) / 1000;
 
                                 productsInserted.push(product.productId);
 
                                 venue.drinks.push({
                                     name: product.eposName,
                                     productId: product.productId,
-                                    price: product.priceValue,
+                                    price: price,
                                     units,
                                 })
                             } else {
@@ -93,7 +120,7 @@ export const handler = async (event: SQSEvent): Promise<void> => {
                                     venue.drinks.push({
                                         name: product.eposName,
                                         productId: product.productId,
-                                        price: product.priceValue,
+                                        price: price,
                                         units,
                                     })
                                   } else {
@@ -106,7 +133,7 @@ export const handler = async (event: SQSEvent): Promise<void> => {
                                     venue.drinks.push({
                                         name: product.eposName,
                                         productId: product.productId,
-                                        price: product.priceValue,
+                                        price: price,
                                         units,
                                     })
                                   }
