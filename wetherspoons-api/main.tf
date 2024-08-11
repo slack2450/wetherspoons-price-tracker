@@ -198,8 +198,7 @@ resource "aws_cloudfront_distribution" "wetherspoons_api" {
 }
 
 resource "cloudflare_zone" "spoons_cheap" {
-  account_id = "1e8c347d09a13db3e3d9a9b45bad28ab"
-  zone       = "spoons.cheap"
+  zone = "spoons.cheap"
 }
 
 resource "cloudflare_record" "api_spoons_cheap" {
