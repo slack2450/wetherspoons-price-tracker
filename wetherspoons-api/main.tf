@@ -69,7 +69,7 @@ resource "aws_apigatewayv2_stage" "wetherspoons_api_stage" {
   auto_deploy = true
   default_route_settings {
     throttling_burst_limit = 5000
-    throttling_rate_limit = 5000
+    throttling_rate_limit  = 5000
   }
 }
 
@@ -198,7 +198,8 @@ resource "aws_cloudfront_distribution" "wetherspoons_api" {
 }
 
 resource "cloudflare_zone" "spoons_cheap" {
-  zone = "spoons.cheap"
+  account_id = "1e8c347d09a13db3e3d9a9b45bad28ab"
+  zone       = "spoons.cheap"
 }
 
 resource "cloudflare_record" "api_spoons_cheap" {

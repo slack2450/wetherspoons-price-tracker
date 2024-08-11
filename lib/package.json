@@ -1,0 +1,14 @@
+{
+  "name": "wetherspoons-lib",
+  "version": "1.0.0",
+  "description": "",
+  "main": "wetherspoons.js",
+  "scripts": {
+    "build": "tsc"
+  },
+  "author": "Joss Bird",
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "typescript": "^4.7.4"
+  }
+}

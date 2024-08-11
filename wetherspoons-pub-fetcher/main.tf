@@ -92,7 +92,7 @@ resource "aws_iam_role_policy_attachment" "wetherspoons_pub_fetcher" {
 
 resource "aws_cloudwatch_event_rule" "every_monday" {
   name                = "every-monday"
-  schedule_expression = "cron(0 6 ? * MON *)"
+  schedule_expression = "cron(0 12 ? * MON *)"
 }
 
 resource "aws_cloudwatch_event_target" "wetherspoons_pub_fetcher" {

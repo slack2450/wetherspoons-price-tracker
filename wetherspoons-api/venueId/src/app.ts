@@ -11,8 +11,6 @@ const ddbDocClient = DynamoDBDocumentClient.from(ddbClient);
 
 const TableName = 'wetherspoons-pubs';
 
-const date: number = new Date().setHours(0, 0, 0, 0);
-
 export const handler = async (event: any) => {
 
     const params: QueryCommandInput = {
