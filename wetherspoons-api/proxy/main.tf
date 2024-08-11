@@ -79,7 +79,7 @@ resource "aws_lambda_function" "wetherspoons_proxy_api" {
   memory_size                    = 128
   reserved_concurrent_executions = -1
   role                           = aws_iam_role.api_role.arn
-  runtime                        = "nodejs16.x"
+  runtime                        = "nodejs18.x"
   timeout                        = 30
 
   ephemeral_storage {
