@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "build": "webpack --mode production && cd dist && zip index.zip index.js",
-    "build:dev": "webpack --mode development"
+    "build:dev": "webpack --mode development && cd dist && zip index.zip index.js"
   },
   "author": "Joss Bird",
   "license": "UNLICENSED",

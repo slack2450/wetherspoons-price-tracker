@@ -36,6 +36,8 @@ async function wetherspoonRequest(request: WetherspoonRequest): Promise<any> {
     }
   );
 
+  if (!res.ok) throw Error(`Response from API was ${res.status} ${res.statusText}`)
+
   return res.json()
 }
 

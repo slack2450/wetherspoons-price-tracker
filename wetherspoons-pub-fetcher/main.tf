@@ -50,7 +50,7 @@ resource "aws_lambda_function" "wetherspoons_pub_fetcher" {
   reserved_concurrent_executions = -1
   role                           = aws_iam_role.wetherspoons_pub_fetcher_role.arn
   runtime                        = "nodejs18.x"
-  timeout                        = 30
+  timeout                        = 120
 
   ephemeral_storage {
     size = 512

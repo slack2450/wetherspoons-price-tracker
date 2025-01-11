@@ -17,6 +17,9 @@ export const handler = async (event: SQSEvent): Promise<void> => {
     const notification = JSON.parse(record.body);
     const inputData = JSON.parse(notification.Message);
 
+    console.log(`inputData:`);
+    console.log(inputData);
+
     const drinks = await getTodaysDrinks(inputData.venueId, inputData.salesAreaId)
 
     for (const drink of drinks) {
