@@ -25,7 +25,9 @@ export const handler = async (event: SQSEvent): Promise<void> => {
     for (const drink of drinks) {
       const point = new Point('drink')
         .tag('venueId', inputData.venueId)
+        .tag('venueName', inputData.venueName)
         .tag('productId', drink.productId.toString())
+        .tag('productName', drink.name)
         .floatField('price', drink.price)
         .floatField('units', drink.units)
 

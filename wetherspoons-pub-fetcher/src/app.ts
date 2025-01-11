@@ -17,6 +17,7 @@ export const handler = async () => {
       TopicArn: 'arn:aws:sns:eu-west-2:729049610945:wetherspoons-pubs',
       Message: JSON.stringify({
         venueId: pub.id,
+        venueName: pub.name,
         salesAreaId: pub.salesArea[0].id,
       }),
     })
