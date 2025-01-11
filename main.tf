@@ -33,6 +33,22 @@ variable "cloudflare_api_email" {
   type = string
 }
 
+variable "influxdb_url" {
+  type = string
+}
+
+variable "influxdb_api_token" {
+  type = string
+}
+
+variable "influxdb_org" {
+  type = string
+}
+
+variable "influxdb_bucket" {
+  type = string
+}
+
 provider "aws" {
   region     = "eu-west-2"
   access_key = var.aws_access_key
@@ -133,8 +149,12 @@ module "wetherspoons_pub_ranker" {
 }
 
 module "wetherspoons_menu_fetcher" {
-  source  = "./wetherspoons-menu-fetcher"
-  sqs_arn = aws_sqs_queue.wetherspoons_queue.arn
+  source             = "./wetherspoons-menu-fetcher"
+  sqs_arn            = aws_sqs_queue.wetherspoons_queue.arn
+  influxdb_url       = var.influxdb_url
+  influxdb_api_token = var.influxdb_api_token
+  influxdb_org       = var.influxdb_org
+  influxdb_bucket    = var.influxdb_bucket
 }
 
 module "wetherspoons_price_api" {

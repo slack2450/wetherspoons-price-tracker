@@ -2,6 +2,22 @@ variable "sqs_arn" {
   type = string
 }
 
+variable "influxdb_url" {
+  type = string
+}
+
+variable "influxdb_api_token" {
+  type = string
+}
+
+variable "influxdb_org" {
+  type = string
+}
+
+variable "influxdb_bucket" {
+  type = string
+}
+
 resource "aws_iam_role" "wetherspoons_menu_fetcher_role" {
   name = "wetherspoons-menu-fetcher-role"
 
