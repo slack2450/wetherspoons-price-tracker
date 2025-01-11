@@ -20,9 +20,9 @@ jobs:
       TF_VAR_cloudflare_api_email: ${{ secrets.cloudflare_api_email }}
       TF_VAR_cloudflare_api_key: ${{ secrets.cloudflare_api_key }}
       TF_VAR_influxdb_api_token: ${{ secrets.influxdb_api_token }}
-      TF_VAR_influxdb_url: ${{ var.influxdb_url }}
-      TF_VAR_influxdb_org: ${{ var.influxdb_org }}
-      TF_VAR_influxdb_bucket: ${{ var.influxdb_bucket }}
+      TF_VAR_influxdb_url: ${{ vars.influxdb_url }}
+      TF_VAR_influxdb_org: ${{ vars.influxdb_org }}
+      TF_VAR_influxdb_bucket: ${{ vars.influxdb_bucket }}
 
     # Use the Bash shell regardless whether the GitHub Actions runner is ubuntu-latest, macos-latest, or windows-latest
     defaults:
