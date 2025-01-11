@@ -8,11 +8,11 @@ axios.defaults.baseURL = 'https://static.wsstack.nn4maws.net';
 
 const influxDB = new InfluxDB({ url: process.env.INFLUXDB_URL!, token: process.env.INFLUXDB_API_TOKEN })
 
-const writeApi = influxDB.getWriteApi(process.env.INFLUXDB_ORG!, process.env.INFLUXDB_BUCKET!)
-
 import { getTodaysDrinks } from '../../lib/src/wetherspoons';
 
 export const handler = async (event: SQSEvent): Promise<void> => {
+  const writeApi = influxDB.getWriteApi(process.env.INFLUXDB_ORG!, process.env.INFLUXDB_BUCKET!)
+
   for (const record of event.Records) {
     const notification = JSON.parse(record.body);
     const inputData = JSON.parse(notification.Message);
