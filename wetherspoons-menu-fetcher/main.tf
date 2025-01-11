@@ -105,6 +105,15 @@ resource "aws_lambda_function" "wetherspoons_menu_fetcher" {
   runtime                        = "nodejs18.x"
   timeout                        = 30
 
+  enviroment {
+    variables = {
+      INFLUXDB_URL       = var.influxdb_url
+      INFLUXDB_API_TOKEN = var.influxdb_api_token
+      INFLUXDB_ORG       = var.influxdb_org
+      INFLUXDB_BUCKET    = var.influxdb_bucket
+    }
+  }
+
   ephemeral_storage {
     size = 512
   }
