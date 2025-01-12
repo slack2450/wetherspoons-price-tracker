@@ -42,8 +42,7 @@ console.log('Fetching venueIds');
 const fetchVenueIds = new Promise<Set<string>>((resolve, reject) => {
   const venueIds = new Set<string>();
 
-  queryApi.queryRows(`
-import "influxdata/influxdb/schema"
+  queryApi.queryRows(`import "influxdata/influxdb/schema"
 
 schema.tagValues(
   bucket: "raw",
@@ -122,16 +121,25 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGateway
       body: ReasonPhrases.BAD_REQUEST
     }
 
-  return {
-    statusCode: StatusCodes.OK,
-    body: await queryApi.queryRaw(
-      `from(bucket: "raw")
+  const query = `from(bucket: "raw")
   |> range(start: -${queryStringParameters.range}, stop: now())
   |> filter(fn: (r) => r["productId"] == "${pathParameters.productId}")
   |> filter(fn: (r) => r["venueId"] == "${pathParameters.venueId}")
   |> filter(fn: (r) => r["_field"] == "price")
   |> aggregateWindow(every: 60m, fn: mean, createEmpty: false)
   |> drop(columns: ["venueName", "productName", "productId", "venueId","_field", "_measurement", "_start", "_stop"])`
-    )
+
+  const results = [];
+  for await (const { values, tableMeta } of queryApi.iterateRows(query)) {
+    const o = tableMeta.toObject(values);
+    results.push({
+      time: o._time,
+      price: o._value
+    })
+  }
+
+  return {
+    statusCode: StatusCodes.OK,
+    body: JSON.stringify(results)
   }
 }
