@@ -42,7 +42,7 @@ data "aws_region" "current" {}
 data "aws_caller_identity" "current" {}
 
 resource "aws_iam_role" "api_role" {
-  name = "wetherspoons-api-venueId-role"
+  name = "wetherspoons-api-price-role"
 
   assume_role_policy = jsonencode(
     {
@@ -79,7 +79,7 @@ resource "aws_iam_role" "api_role" {
 
 resource "aws_lambda_function" "wetherspoons_price_api" {
 
-  function_name = "wetherspoons-api-venueId"
+  function_name = "wetherspoons-api-price"
 
   architectures = [
     "arm64",

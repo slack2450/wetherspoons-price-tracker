@@ -9,6 +9,7 @@ const influxDB = new InfluxDB({ url: process.env.INFLUXDB_URL!, token: process.e
 
 const queryApi = influxDB.getQueryApi(process.env.INFLUXDB_ORG!);
 
+console.log('Fetching productIds');
 const fetchProductIds = new Promise<Set<string>>((resolve, reject) => {
   const productIds = new Set<string>();
 
@@ -37,6 +38,7 @@ schema.tagValues(
     });
 });
 
+console.log('Fetching venueIds');
 const fetchVenueIds = new Promise<Set<string>>((resolve, reject) => {
   const venueIds = new Set<string>();
 
@@ -67,32 +69,40 @@ schema.tagValues(
 
 export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGatewayProxyResultV2> => {
 
-  if (!event.pathParameters || !event.queryStringParameters)
+  console.log(event);
+
+  if (!event.pathParameters || !event.queryStringParameters) {
+    console.error('Missing path or query string parameters');
     return {
       statusCode: StatusCodes.BAD_REQUEST,
       body: ReasonPhrases.BAD_REQUEST
     }
+  }
 
   const pathParameters = {
     venueId: event.pathParameters.venueId,
     productId: event.pathParameters.productId
   }
-  if (typeof pathParameters.venueId !== "string" || typeof pathParameters.productId !== "string")
+  if (typeof pathParameters.venueId !== "string" || typeof pathParameters.productId !== "string") {
+    console.error('Missing venueId or productId');
     return {
       statusCode: StatusCodes.NOT_FOUND,
       body: ReasonPhrases.NOT_FOUND
     }
+  }
   console.log('Path parameters:')
   console.log(pathParameters)
 
   const queryStringParameters = {
     range: event.queryStringParameters
   }
-  if (typeof queryStringParameters.range !== "string")
+  if (typeof queryStringParameters.range !== "string") {
+    console.error('Missing range query string')
     return {
       statusCode: StatusCodes.BAD_REQUEST,
       body: ReasonPhrases.BAD_REQUEST
     }
+  }
   console.log('Query string parameters:')
   console.log(queryStringParameters)
 
