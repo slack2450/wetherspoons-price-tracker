@@ -131,7 +131,7 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGateway
   |> filter(fn: (r) => r["venueId"] == "${pathParameters.venueId}")
   |> filter(fn: (r) => r["_field"] == "price")
   |> aggregateWindow(every: 60m, fn: mean, createEmpty: false)
-  |> drop(columns: ["venueName", "productName", "productId", "venueId"])`
+  |> drop(columns: ["venueName", "productName", "productId", "venueId","_field", "_measurement", "_start", "_stop"])`
     )
   }
 }
