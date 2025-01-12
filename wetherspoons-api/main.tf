@@ -27,6 +27,17 @@ variable "cloudflare_api_email" {
   type = string
 }
 
+variable "influxdb_url" {
+  type = string
+}
+
+variable "influxdb_read_api_token" {
+  type = string
+}
+
+variable "influxdb_org" {
+  type = string
+}
 provider "aws" {
   region     = "eu-west-2"
   access_key = var.aws_access_key
@@ -229,11 +240,14 @@ module "proxy" {
   api_id         = aws_apigatewayv2_api.wetherspoons_api.id
 }
 
-module "venueId" {
-  source         = "./venueId"
-  aws_access_key = var.aws_access_key
-  aws_secret_key = var.aws_secret_key
-  api_id         = aws_apigatewayv2_api.wetherspoons_api.id
+module "price" {
+  source                  = "./price"
+  aws_access_key          = var.aws_access_key
+  aws_secret_key          = var.aws_secret_key
+  api_id                  = aws_apigatewayv2_api.wetherspoons_api.id
+  influxdb_url            = var.influxdb_url
+  influxdb_read_api_token = var.influxdb_read_api_token
+  influxdb_org            = var.influxdb_org
 }
 
 module "rankings" {

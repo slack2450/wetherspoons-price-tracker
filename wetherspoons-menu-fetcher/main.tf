@@ -6,7 +6,7 @@ variable "influxdb_url" {
   type = string
 }
 
-variable "influxdb_api_token" {
+variable "influxdb_write_api_token" {
   type = string
 }
 
@@ -107,10 +107,10 @@ resource "aws_lambda_function" "wetherspoons_menu_fetcher" {
 
   environment {
     variables = {
-      INFLUXDB_URL       = var.influxdb_url
-      INFLUXDB_API_TOKEN = var.influxdb_api_token
-      INFLUXDB_ORG       = var.influxdb_org
-      INFLUXDB_BUCKET    = var.influxdb_bucket
+      INFLUXDB_URL             = var.influxdb_url
+      INFLUXDB_WRITE_API_TOKEN = var.influxdb_write_api_token
+      INFLUXDB_ORG             = var.influxdb_org
+      INFLUXDB_BUCKET          = var.influxdb_bucket
     }
   }
 

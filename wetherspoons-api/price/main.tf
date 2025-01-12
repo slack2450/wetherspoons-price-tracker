@@ -82,6 +82,15 @@ resource "aws_lambda_function" "wetherspoons_price_api" {
   runtime                        = "nodejs18.x"
   timeout                        = 30
 
+  environment {
+    variables = {
+      INFLUXDB_URL            = var.influxdb_url
+      INFLUXDB_READ_API_TOKEN = var.influxdb_read_api_token
+      INFLUXDB_ORG            = var.influxdb_org
+      INFLUXDB_BUCKET         = var.influxdb_bucket
+    }
+  }
+
   ephemeral_storage {
     size = 512
   }
@@ -129,7 +138,7 @@ resource "aws_apigatewayv2_integration" "integration" {
 
 resource "aws_apigatewayv2_route" "wetherspoons_api_price_route" {
   api_id    = var.api_id
-  route_key = "GET /v1/price/{venueId}"
+  route_key = "GET /v2/price/{venueId}/{productId}"
   target    = "integrations/${aws_apigatewayv2_integration.integration.id}"
 }
 
@@ -137,5 +146,5 @@ resource "aws_lambda_permission" "wetherspoons_api_price_route_permission" {
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.wetherspoons_price_api.function_name
   principal     = "apigateway.amazonaws.com"
-  source_arn    = "arn:aws:execute-api:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:${var.api_id}/*/*/v1/price/{venueId}"
+  source_arn    = "arn:aws:execute-api:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:${var.api_id}/*/*/v2/price/{venueId}/{productId}"
 }

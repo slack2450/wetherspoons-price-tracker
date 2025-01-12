@@ -6,7 +6,7 @@ import { InfluxDB, Point } from '@influxdata/influxdb-client';
 import axios from 'axios';
 axios.defaults.baseURL = 'https://static.wsstack.nn4maws.net';
 
-const influxDB = new InfluxDB({ url: process.env.INFLUXDB_URL!, token: process.env.INFLUXDB_API_TOKEN })
+const influxDB = new InfluxDB({ url: process.env.INFLUXDB_URL!, token: process.env.INFLUXDB_WRITE_API_TOKEN })
 
 import { getTodaysDrinks } from '../../lib/src/wetherspoons';
 
