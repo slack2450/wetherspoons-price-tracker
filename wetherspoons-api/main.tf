@@ -105,7 +105,10 @@ resource "aws_cloudfront_cache_policy" "wetherspoons_api_cache" {
     }
 
     query_strings_config {
-      query_string_behavior = "none"
+      query_string_behavior = "whitelist"
+      query_strings {
+        items = ["range"]
+      }
     }
   }
 }

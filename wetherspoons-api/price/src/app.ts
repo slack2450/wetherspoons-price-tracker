@@ -94,7 +94,7 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGateway
   console.log(pathParameters)
 
   const queryStringParameters = {
-    range: event.queryStringParameters
+    range: event.queryStringParameters.range
   }
   if (typeof queryStringParameters.range !== "string") {
     console.error('Missing range query string')
