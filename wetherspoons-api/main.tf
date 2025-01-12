@@ -38,6 +38,7 @@ variable "influxdb_read_api_token" {
 variable "influxdb_org" {
   type = string
 }
+
 provider "aws" {
   region     = "eu-west-2"
   access_key = var.aws_access_key

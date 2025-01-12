@@ -10,6 +10,18 @@ variable "api_id" {
   type = string
 }
 
+variable "influxdb_url" {
+  type = string
+}
+
+variable "influxdb_read_api_token" {
+  type = string
+}
+
+variable "influxdb_org" {
+  type = string
+}
+
 terraform {
   required_providers {
     aws = {
