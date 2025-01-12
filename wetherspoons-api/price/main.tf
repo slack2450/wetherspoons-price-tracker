@@ -99,7 +99,6 @@ resource "aws_lambda_function" "wetherspoons_price_api" {
       INFLUXDB_URL            = var.influxdb_url
       INFLUXDB_READ_API_TOKEN = var.influxdb_read_api_token
       INFLUXDB_ORG            = var.influxdb_org
-      INFLUXDB_BUCKET         = var.influxdb_bucket
     }
   }
 
