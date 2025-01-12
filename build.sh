@@ -24,7 +24,7 @@ cd ./proxy
 npm ci
 npm run build
 cd ..
-cd ./venueId
+cd ./price
 npm ci
 npm run build
 cd ..
@@ -39,3 +39,4 @@ cd ./wetherspoons-pub-ranker
 npm ci
 npm run build
 cd ..
+
