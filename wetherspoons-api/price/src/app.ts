@@ -133,7 +133,7 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGateway
   for await (const { values, tableMeta } of queryApi.iterateRows(query)) {
     const o = tableMeta.toObject(values);
     results.push({
-      time: o._time,
+      timestamp: o._time,
       price: o._value
     })
   }
