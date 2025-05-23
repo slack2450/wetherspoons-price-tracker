@@ -40,3 +40,4 @@ npm ci
 npm run build
 cd ..
 
+echo "Build succesful!"

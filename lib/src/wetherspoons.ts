@@ -38,7 +38,9 @@ async function wetherspoonRequest(request: WetherspoonRequest): Promise<any> {
 
   if (!res.ok) throw Error(`Response from API was ${res.status} ${res.statusText}`)
 
-  return res.json()
+  const response = res.json()
+
+  return response
 }
 
 interface MenuResponse {
@@ -50,7 +52,7 @@ interface Menu {
   name: string;
 }
 
-async function getMenus(siteId: number, salesAreaId: number): Promise<Menu[]> {
+export async function getMenus(siteId: number, salesAreaId: number): Promise<Menu[]> {
   const res: MenuResponse = await wetherspoonRequest(
     {
       method: 'getMenus',
@@ -125,7 +127,7 @@ interface ProductItemProduct {
   displayName: string;
 }
 
-async function getMenuPages(siteId: number, salesAreaId: number, menuId: number): Promise<MenuPagesResponse> {
+export async function getMenuPages(siteId: number, salesAreaId: number, menuId: number): Promise<MenuPagesResponse> {
   return wetherspoonRequest(
     {
       method: 'getMenuPages',
@@ -248,6 +250,7 @@ export async function getTodaysDrinks(venueId: number, salesAreaId: number): Pro
 }
 
 interface GlobalsVenue {
+  id: number,
   identifier: number | null;
   is_closed: number;
 }
@@ -262,11 +265,11 @@ export async function getOpenPubs(): Promise<Pub[]> {
   // Fetch globals.json
   const globals: Globals = await (await fetch('https://oandp-appmgr-prod.s3.eu-west-2.amazonaws.com/global.json')).json();
 
-  console.log(globals)
+  //console.log(globals)
 
   const open = new Set<string>();
   for (const venue of globals.venues) {
-    console.log(venue)
+    //console.log(venue)
     if (venue.is_closed === 0 && venue.identifier != null) {
       open.add(venue.identifier.toString());
     }
