@@ -414,12 +414,7 @@ export class WetherspoonsZonalAPI {
     response: z.literal("OK"),
     menuCategoryDisabled: z.number().optional(),
     cached_at: z.string().optional()
-  }).or(
-    // Often Cache miss meaning it doesn't exist
-    z.object({
-      message: z.string(),
-    }),
-  );
+  });
 
   static async getMenuPages({ siteId, salesAreaId, menuId }: { siteId: number, salesAreaId: number, menuId: number }): Promise<z.infer<typeof this.getMenuPagesResponseSchema>> {
     const response = await this.request({

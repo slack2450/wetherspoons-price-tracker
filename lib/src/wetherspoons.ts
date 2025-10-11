@@ -1,185 +1,51 @@
+import { WetherspoonsAPI } from './apis/jdw-apps';
 import { Drink } from './types/Drink';
-import { Pub } from './types/Pub';
-
-interface WetherspoonRequest {
-  method: string;
-  siteId?: number;
-  menuId?: number;
-  salesAreaId?: number;
-}
-
-async function wetherspoonRequest(request: WetherspoonRequest): Promise<any> {
-  const requestDefaults = {
-    platform: "nintendo-ds",
-    bundleIdentifier: "com.stella.enjoyers",
-    userDeviceIdentifier: "i-love-drinking-beer",
-    version: "1.0.0",
-  }
-
-  const form = new FormData();
-  form.append(
-    'request',
-    JSON.stringify(
-      {
-        'request': { ...requestDefaults, ...request }
-      }
-    )
-  );
-
-  const res = await fetch('https://zc.ca.jdw-apps.net/api/iorder',
-    {
-      headers: {
-        'x-api-key': 'SH0obBv23pj7lUrg5SESDdJO8fS9p0ND',
-      },
-      body: form,
-      method: 'POST'
-    }
-  );
-
-  if (!res.ok) throw Error(`Response from API was ${res.status} ${res.statusText}`)
-
-  const response = res.json()
-
-  return response
-}
-
-interface MenuResponse {
-  menus: Menu[];
-}
-
-interface Menu {
-  id: number;
-  name: string;
-}
-
-export async function getMenus(siteId: number, salesAreaId: number): Promise<Menu[]> {
-  const res: MenuResponse = await wetherspoonRequest(
-    {
-      method: 'getMenus',
-      siteId,
-      salesAreaId
-    }
-  )
-  return res.menus;
-}
-
-interface MenuPagesResponse {
-  aztec: Aztec;
-  display: Display;
-}
-
-interface Aztec {
-  products: Product[];
-}
-
-interface Product {
-  id: number;
-  eposName: string;
-  displayRecords: DisplayRecord[];
-  portions: Portion[];
-}
-
-interface DisplayRecord {
-  description: string;
-  name: string;
-}
-
-interface Portion {
-  name: string;
-  price: number;
-}
-
-interface Display {
-  displayGroups: DisplayGroup[];
-}
-
-interface DisplayGroup {
-  groupId: number;
-  groupName: string;
-  items: Item[]
-}
-
-type Item = ProductItem | TextItem | HyperLinkItem | SubHeaderItem;
-
-interface SubHeaderItem {
-  itemId: number;
-  itemType: 'subHeader';
-}
-
-interface TextItem {
-  itemId: number;
-  itemType: 'textField';
-}
-
-interface HyperLinkItem {
-  itemId: number;
-  itemType: 'hyperlink';
-}
-
-interface ProductItem {
-  itemId: number;
-  itemType: 'product'
-  product: ProductItemProduct;
-}
-
-interface ProductItemProduct {
-  productId: number;
-  displayName: string;
-}
-
-export async function getMenuPages(siteId: number, salesAreaId: number, menuId: number): Promise<MenuPagesResponse> {
-  return wetherspoonRequest(
-    {
-      method: 'getMenuPages',
-      siteId,
-      salesAreaId,
-      menuId
-    }
-  );
-}
 
 function strengthAndVolumeToUnits(strength: number, volume: number) {
   return (strength * volume) / 1000;
 }
 
-export async function getTodaysDrinks(venueId: number, salesAreaId: number): Promise<Drink[]> {
+export async function getTodaysDrinks(highLevelVenue: WetherspoonsAPI.HighLevelVenue): Promise<Drink[]> {
 
-  const menus = await getMenus(venueId, salesAreaId);
+  const detailedVenue = await WetherspoonsAPI.getVenue(highLevelVenue);
 
-  let menuId;
+  const salesArea = detailedVenue.salesAreas[0];
+
+  const menus = await WetherspoonsAPI.getMenus({ venue: detailedVenue, salesAreaId: salesArea.id });
+
+  let drinksMenu;
   for (const menu of menus) {
     if (menu.name === 'Drinks') {
-      menuId = menu.id;
+      drinksMenu = menu;
       break;
     }
   }
 
-  if (!menuId) return [];
-  const res = await getMenuPages(venueId, salesAreaId, menuId);
+  if (!drinksMenu) return [];
+  const res = await WetherspoonsAPI.getMenu(drinksMenu);
 
   // Convert menu to flat array of drinks
-  const displayedItems = res.display.displayGroups.map(
-    (displayGroup) => {
-      const products = displayGroup.items.filter(item => item.itemType === 'product') as ProductItem[];
-      return products.map((item) => item.product)
-    }
-  ).flat(1);
+  const hash_map = new Map<number, WetherspoonsAPI.DetailedMenuProduct>();
 
-  const displayNameLookup = new Map<number, string>();
-  for (const displayItem of displayedItems) {
-    displayNameLookup.set(displayItem.productId, displayItem.displayName);
+  for (const categories of res.data.categories) {
+    for (const itemGroup of categories.itemGroups) {
+      for (const item of itemGroup.items) {
+        if (item.itemType == 'product') {
+          // Skip out of stock
+          if (item.isOutOfStock) continue;
+          hash_map.set(item.id, item)
+        }
+      }
+    }
   }
 
   const drinks: Drink[] = [];
 
-  for (const product of res.aztec.products) {
-
-    // Skip hidden menus items
-    if (!displayNameLookup.has(product.id)) continue;
+  for (const product of hash_map.values()) {
 
 
-    const strengthMatches = product.displayRecords?.[0]?.description.match(/(\d?\d?\.?\d?\d%)\s?ABV/);
-    const volumeDescriptionMatches = product.displayRecords?.[0]?.description.match(/(\d?\d\d)ml/);
+    const strengthMatches = product.description.match(/(\d?\d?\.?\d?\d%)\s?ABV/);
+    const volumeDescriptionMatches = product.description.match(/(\d?\d\d)ml/);
 
     let strength;
     if (strengthMatches)
@@ -193,35 +59,35 @@ export async function getTodaysDrinks(venueId: number, salesAreaId: number): Pro
     let bestPPU = Infinity;
     let bestUnits = 0;
 
-    for (const portion of product.portions) {
+    for (const portion of product.options.portion.options) {
       let units;
 
-      const volumeMatches = portion.name.match(/(\d?\d\d)ml/);
+      const volumeMatches = portion.label.match(/(\d?\d\d)ml/);
 
       let volume;
       if (volumeMatches)
         volume = parseFloat(volumeMatches[1]);
 
-      const unitsMatches = portion.name.match(/(\d?\.?\d?\d) unit/);
+      const unitsMatches = portion.label.match(/(\d?\.?\d?\d) unit/);
       if (unitsMatches)
         units = parseFloat(unitsMatches[1]);
 
-      if (portion.name === 'Pint' && strength) {
+      if (portion.label === 'Pint' && strength) {
         units = strengthAndVolumeToUnits(strength, 568);
-      } else if (['Half pint', 'Half Pint', 'Half'].includes(portion.name) && typeof strength !== 'undefined') {
+      } else if (['Half pint', 'Half Pint', 'Half'].includes(portion.label) && typeof strength !== 'undefined') {
         units = strengthAndVolumeToUnits(strength, 284);
       } else if (typeof strength !== 'undefined' && volume) {
         units = strengthAndVolumeToUnits(strength, volume);
       } else if (typeof strength !== 'undefined' && volumeDescription) {
         units = strengthAndVolumeToUnits(strength, volumeDescription);
-      } else if (typeof strength !== 'undefined' && portion.name === 'Single') {
+      } else if (typeof strength !== 'undefined' && portion.label === 'Single') {
         units = strengthAndVolumeToUnits(strength, 25)
-      } else if (typeof strength !== 'undefined' && portion.name === 'Double') {
+      } else if (typeof strength !== 'undefined' && portion.label === 'Double') {
         units = strengthAndVolumeToUnits(strength, 50)
       }
 
       if (typeof units !== 'undefined') {
-        const ppu = portion.price / units;
+        const ppu = portion.value.price.value / units;
 
         if (ppu < bestPPU) {
           bestPPU = ppu;
@@ -233,11 +99,11 @@ export async function getTodaysDrinks(venueId: number, salesAreaId: number): Pro
 
     if (typeof bestPortion !== 'undefined') {
       drinks.push({
-        name: displayNameLookup.get(product.id) || product.eposName,
+        name: product.name,
         units: bestUnits,
         ppu: bestPPU,
         productId: product.id,
-        price: bestPortion?.price,
+        price: bestPortion?.value.price.value,
       })
     }
   }
@@ -247,44 +113,4 @@ export async function getTodaysDrinks(venueId: number, salesAreaId: number): Pro
   });
 
   return drinks;
-}
-
-interface GlobalsVenue {
-  id: number,
-  identifier: number | null;
-  is_closed: number;
-}
-
-interface Globals {
-  venues: GlobalsVenue[];
-}
-
-export async function getOpenPubs(): Promise<Pub[]> {
-  const pubs: Pub[] = [];
-
-  // Fetch globals.json
-  const globals: Globals = await (await fetch('https://oandp-appmgr-prod.s3.eu-west-2.amazonaws.com/global.json')).json();
-
-  //console.log(globals)
-
-  const open = new Set<string>();
-  for (const venue of globals.venues) {
-    //console.log(venue)
-    if (venue.is_closed === 0 && venue.identifier != null) {
-      open.add(venue.identifier.toString());
-    }
-  }
-
-  const resBody = await wetherspoonRequest(
-    {
-      method: 'venues'
-    }
-  );
-
-  for (const venue of resBody.venues) {
-    if (venue?.salesArea?.[0]?.canPlaceOrder && open.has(venue.venueRef)) {
-      pubs.push(venue)
-    }
-  }
-  return pubs;
 }

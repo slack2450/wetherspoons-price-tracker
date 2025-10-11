@@ -2,6 +2,7 @@
 
 import { SQSEvent } from 'aws-lambda';
 import { InfluxDB, Point } from '@influxdata/influxdb-client';
+import { WetherspoonsAPI } from '../../lib/src/apis/jdw-apps';
 
 import axios from 'axios';
 axios.defaults.baseURL = 'https://static.wsstack.nn4maws.net';
@@ -15,23 +16,28 @@ export const handler = async (event: SQSEvent): Promise<void> => {
 
   for (const record of event.Records) {
     const notification = JSON.parse(record.body);
-    const inputData = JSON.parse(notification.Message);
+    const venue = WetherspoonsAPI.highLevelVenueSchema.parse(notification.Message);
 
     console.log(`inputData:`);
-    console.log(inputData);
+    console.log(venue);
 
-    const drinks = await getTodaysDrinks(inputData.venueId, inputData.salesAreaId)
+    try {
 
-    for (const drink of drinks) {
-      const point = new Point('drink')
-        .tag('venueId', inputData.venueId)
-        .tag('venueName', inputData.venueName)
-        .tag('productId', drink.productId.toString())
-        .tag('productName', drink.name)
-        .floatField('price', drink.price)
-        .floatField('units', drink.units)
+      const drinks = await getTodaysDrinks(venue)
 
-      writeApi.writePoint(point)
+      for (const drink of drinks) {
+        const point = new Point('drink')
+          .tag('venueId', venue.venueRef.toString())
+          .tag('venueName', venue.name)
+          .tag('productId', drink.productId.toString())
+          .tag('productName', drink.name)
+          .floatField('price', drink.price)
+          .floatField('units', drink.units)
+
+        writeApi.writePoint(point)
+      }
+    } catch (error) {
+      console.log(`Failed to get drinks data for ${venue.name} (${venue.id})`)
     }
   }
 
