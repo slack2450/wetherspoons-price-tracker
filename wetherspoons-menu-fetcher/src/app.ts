@@ -4,9 +4,6 @@ import { SQSEvent } from 'aws-lambda';
 import { InfluxDB, Point } from '@influxdata/influxdb-client';
 import { WetherspoonsAPI } from '../../lib/src/apis/jdw-apps';
 
-import axios from 'axios';
-axios.defaults.baseURL = 'https://static.wsstack.nn4maws.net';
-
 const influxDB = new InfluxDB({ url: process.env.INFLUXDB_URL!, token: process.env.INFLUXDB_WRITE_API_TOKEN })
 
 import { getTodaysDrinks } from '../../lib/src/wetherspoons';
