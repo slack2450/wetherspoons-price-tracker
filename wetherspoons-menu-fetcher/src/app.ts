@@ -15,10 +15,11 @@ export const handler = async (event: SQSEvent): Promise<void> => {
   const writeApi = influxDB.getWriteApi(process.env.INFLUXDB_ORG!, process.env.INFLUXDB_BUCKET!)
 
   for (const record of event.Records) {
-    const notification = JSON.parse(record.body);
-    const venue = WetherspoonsAPI.highLevelVenueSchema.parse(notification.Message);
+    console.log(record)
 
-    console.log(`inputData:`);
+    const notification = JSON.parse(record.body);
+    const raw = JSON.parse(notification.Message)
+    const venue = WetherspoonsAPI.highLevelVenueSchema.parse(raw);
     console.log(venue);
 
     try {
@@ -36,6 +37,8 @@ export const handler = async (event: SQSEvent): Promise<void> => {
 
         writeApi.writePoint(point)
       }
+
+      console.log(`Fetched drinks data for ${venue.name} (${venue.id})`)
     } catch (error) {
       console.log(`Failed to get drinks data for ${venue.name} (${venue.id})`)
     }

@@ -11,8 +11,12 @@ export const handler = async () => {
 
   const venues = await WetherspoonsAPI.venues();
 
+  console.log(`Fetch ${venues.length} pubs`);
+
   for (const venue of venues) {
     if (venue.isClosed) continue;
+
+    console.log(`Submitting ${venue.name} (${venue.id}) for processing`)
 
     const command = new PublishCommand({
       TopicArn: 'arn:aws:sns:eu-west-2:729049610945:wetherspoons-pubs',
