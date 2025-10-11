@@ -103,7 +103,7 @@ resource "aws_lambda_function" "wetherspoons_menu_fetcher" {
   reserved_concurrent_executions = -1
   role                           = aws_iam_role.wetherspoons_menu_fetcher_role.arn
   runtime                        = "nodejs18.x"
-  timeout                        = 30
+  timeout                        = 120
 
   environment {
     variables = {
