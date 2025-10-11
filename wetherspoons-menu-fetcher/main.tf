@@ -99,7 +99,7 @@ resource "aws_lambda_function" "wetherspoons_menu_fetcher" {
   filename                       = "${path.module}/dist/index.zip"
   source_code_hash               = filebase64sha256("${path.module}/dist/index.zip")
   handler                        = "index.handler"
-  memory_size                    = 128
+  memory_size                    = 512
   reserved_concurrent_executions = -1
   role                           = aws_iam_role.wetherspoons_menu_fetcher_role.arn
   runtime                        = "nodejs18.x"
