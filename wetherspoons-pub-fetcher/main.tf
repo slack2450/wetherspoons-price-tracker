@@ -18,23 +18,24 @@ resource "aws_iam_role" "wetherspoons_pub_fetcher_role" {
     }
   )
   name = "wetherspoons-pub-fetcher-role"
+}
 
-  inline_policy {
-    name = "sns-publish"
-    policy = jsonencode(
-      {
-        Statement = [
-          {
-            Action   = "sns:Publish"
-            Effect   = "Allow"
-            Resource = var.sns_topic_arn
-            Sid      = "VisualEditor0"
-          },
-        ]
-        Version = "2012-10-17"
-      }
-    )
-  }
+resource "aws_iam_role_policy" "wetherspoons_pub_fetcher_sns" {
+  name = "sns-publish"
+  role = aws_iam_role.wetherspoons_pub_fetcher_role.id
+  policy = jsonencode(
+    {
+      Statement = [
+        {
+          Action   = "sns:Publish"
+          Effect   = "Allow"
+          Resource = var.sns_topic_arn
+          Sid      = "VisualEditor0"
+        },
+      ]
+      Version = "2012-10-17"
+    }
+  )
 }
 
 resource "aws_lambda_function" "wetherspoons_pub_fetcher" {

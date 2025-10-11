@@ -1,16 +1,7 @@
-import { mean } from 'lodash';
-import {variance, sampleCovariance} from 'simple-statistics'
+//import { mean } from 'lodash';
+//import {variance, sampleCovariance} from 'simple-statistics'
 
-// Create service client module using ES6 syntax.
-import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-
-// Create an Amazon DynamoDB service client object.
-const ddbClient = new DynamoDBClient({ region: 'eu-west-2' });
-
-import { DynamoDBDocumentClient, PutCommand, QueryCommand, QueryCommandInput } from "@aws-sdk/lib-dynamodb";
-const ddbDocClient = DynamoDBDocumentClient.from(ddbClient);
-
-interface Drink {
+/* interface Drink {
     name: string;
     units: number;
     productId: number;
@@ -26,10 +17,13 @@ interface Pub {
     spiritAvgPPU: number;
     mahld: number;
     rank: number;
-}
+} */
 
 export const handler = async() => {
-    const date = new Date().setHours(0, 0, 0, 0);
+    // TODO: Fix ranking
+    return;
+
+    /*const date = new Date().setHours(0, 0, 0, 0);
 
     const pubs: Pub[] = [];
 
@@ -143,5 +137,5 @@ export const handler = async() => {
 
     const command = new PutCommand({ TableName: 'wetherspoons-pub-rankings', Item: rankings });
 
-    await ddbDocClient.send(command);
+    await ddbDocClient.send(command);*/
 }

@@ -35,59 +35,43 @@ resource "aws_iam_role" "wetherspoons_menu_fetcher_role" {
       Version = "2012-10-17"
     }
   )
+}
 
-  inline_policy {
-    name = "DynamoDB"
-    policy = jsonencode(
-      {
-        Statement = [
-          {
-            Action   = "dynamodb:*"
-            Effect   = "Allow"
-            Resource = "*"
-            Sid      = "VisualEditor0"
-          },
-        ]
-        Version = "2012-10-17"
-      }
-    )
-  }
-
-  inline_policy {
-    name = "SQS"
-    policy = jsonencode(
-      {
-        Statement = [
-          {
-            Action = [
-              "sqs:DeleteMessage",
-              "sqs:GetQueueUrl",
-              "sqs:ListDeadLetterSourceQueues",
-              "sqs:ChangeMessageVisibility",
-              "sqs:PurgeQueue",
-              "sqs:ReceiveMessage",
-              "sqs:DeleteQueue",
-              "sqs:SendMessage",
-              "sqs:GetQueueAttributes",
-              "sqs:ListQueueTags",
-              "sqs:CreateQueue",
-              "sqs:SetQueueAttributes",
-            ]
-            Effect   = "Allow"
-            Resource = var.sqs_arn
-            Sid      = "VisualEditor0"
-          },
-          {
-            Action   = "sqs:ListQueues"
-            Effect   = "Allow"
-            Resource = "*"
-            Sid      = "VisualEditor1"
-          },
-        ]
-        Version = "2012-10-17"
-      }
-    )
-  }
+resource "aws_iam_role_policy" "wetherspoons_menu_fetcher_sqs" {
+  name = "SQS"
+  role = aws_iam_role.wetherspoons_menu_fetcher_role.id
+  policy = jsonencode(
+    {
+      Statement = [
+        {
+          Action = [
+            "sqs:DeleteMessage",
+            "sqs:GetQueueUrl",
+            "sqs:ListDeadLetterSourceQueues",
+            "sqs:ChangeMessageVisibility",
+            "sqs:PurgeQueue",
+            "sqs:ReceiveMessage",
+            "sqs:DeleteQueue",
+            "sqs:SendMessage",
+            "sqs:GetQueueAttributes",
+            "sqs:ListQueueTags",
+            "sqs:CreateQueue",
+            "sqs:SetQueueAttributes",
+          ]
+          Effect   = "Allow"
+          Resource = var.sqs_arn
+          Sid      = "VisualEditor0"
+        },
+        {
+          Action   = "sqs:ListQueues"
+          Effect   = "Allow"
+          Resource = "*"
+          Sid      = "VisualEditor1"
+        },
+      ]
+      Version = "2012-10-17"
+    }
+  )
 }
 
 resource "aws_lambda_function" "wetherspoons_menu_fetcher" {

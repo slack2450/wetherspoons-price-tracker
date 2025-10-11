@@ -15,23 +15,6 @@ resource "aws_iam_role" "wetherspoons_pub_ranker_role" {
       Version = "2012-10-17"
     }
   )
-
-  inline_policy {
-    name = "DynamoDB"
-    policy = jsonencode(
-      {
-        Statement = [
-          {
-            Action   = "dynamodb:*"
-            Effect   = "Allow"
-            Resource = "*"
-            Sid      = "VisualEditor0"
-          },
-        ]
-        Version = "2012-10-17"
-      }
-    )
-  }
 }
 
 resource "aws_lambda_function" "wetherspoons_pub_ranker" {

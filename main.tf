@@ -87,62 +87,6 @@ resource "aws_sns_topic_subscription" "wetherspoons_pubs_sqs_target" {
   endpoint  = aws_sqs_queue.wetherspoons_queue.arn
 }
 
-resource "aws_dynamodb_table" "wetherspoons_drinks" {
-  billing_mode = "PAY_PER_REQUEST"
-  hash_key     = "id"
-  name         = "wetherspoons-drinks"
-  table_class  = "STANDARD"
-
-  attribute {
-    name = "id"
-    type = "S"
-  }
-  attribute {
-    name = "venueIdProductId"
-    type = "S"
-  }
-
-  global_secondary_index {
-    hash_key        = "venueIdProductId"
-    name            = "venueIdProductId-index"
-    projection_type = "ALL"
-  }
-}
-
-resource "aws_dynamodb_table" "wetherspoons_pubs" {
-  name         = "wetherspoons-pubs"
-  hash_key     = "venueId"
-  range_key    = "date"
-  billing_mode = "PAY_PER_REQUEST"
-
-  attribute {
-    name = "venueId"
-    type = "N"
-  }
-
-  attribute {
-    name = "date"
-    type = "N"
-  }
-
-  global_secondary_index {
-    hash_key        = "date"
-    name            = "DateIndex"
-    projection_type = "ALL"
-  }
-}
-
-resource "aws_dynamodb_table" "wetherspoons_pub_rankings" {
-  name         = "wetherspoons-pub-rankings"
-  hash_key     = "date"
-  billing_mode = "PAY_PER_REQUEST"
-
-  attribute {
-    name = "date"
-    type = "N"
-  }
-}
-
 module "wetherspoons_pub_fetcher" {
   source        = "./wetherspoons-pub-fetcher"
   sns_topic_arn = aws_sns_topic.wetherspoons_pubs.arn
