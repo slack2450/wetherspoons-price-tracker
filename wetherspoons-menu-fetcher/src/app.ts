@@ -2,11 +2,9 @@
 
 import { SQSEvent } from 'aws-lambda';
 import { InfluxDB, Point } from '@influxdata/influxdb-client';
-import { WetherspoonsAPI } from '../../lib/src/apis/jdw-apps';
+import { highLevelVenueSchema, getDrinks } from 'wetherspoons-api';
 
 const influxDB = new InfluxDB({ url: process.env.INFLUXDB_URL!, token: process.env.INFLUXDB_WRITE_API_TOKEN })
-
-import { getTodaysDrinks } from '../../lib/src/wetherspoons';
 
 export const handler = async (event: SQSEvent): Promise<void> => {
   const writeApi = influxDB.getWriteApi(process.env.INFLUXDB_ORG!, process.env.INFLUXDB_BUCKET!)
@@ -16,12 +14,12 @@ export const handler = async (event: SQSEvent): Promise<void> => {
 
     const notification = JSON.parse(record.body);
     const raw = JSON.parse(notification.Message)
-    const venue = WetherspoonsAPI.highLevelVenueSchema.parse(raw);
+    const venue = highLevelVenueSchema.parse(raw);
     console.log(venue);
 
     try {
 
-      const drinks = await getTodaysDrinks(venue)
+      const drinks = await getDrinks(venue)
 
       for (const drink of drinks) {
         const point = new Point('drink')

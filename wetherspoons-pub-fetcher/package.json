@@ -10,7 +10,8 @@
   "author": "Joss Bird",
   "license": "UNLICENSED",
   "dependencies": {
-    "@aws-sdk/client-sns": "^3.131.0"
+    "@aws-sdk/client-sns": "^3.131.0",
+    "wetherspoons-api": "^0.0.7"
   },
   "devDependencies": {
     "@babel/core": "^7.28.4",

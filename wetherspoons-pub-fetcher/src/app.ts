@@ -4,16 +4,16 @@ import { SNSClient, PublishCommand } from '@aws-sdk/client-sns';
 
 const client = new SNSClient({ region: 'eu-west-2' });
 
-import { WetherspoonsAPI } from "../../lib/src/apis/jdw-apps";
+import { venues } from 'wetherspoons-api';
 
 export const handler = async () => {
   const snsPromises = [];
 
-  const venues = await WetherspoonsAPI.venues();
+  const highLevelVenues = await venues();
 
-  console.log(`Fetch ${venues.length} pubs`);
+  console.log(`Fetch ${highLevelVenues.length} pubs`);
 
-  for (const venue of venues) {
+  for (const venue of highLevelVenues) {
     if (venue.isClosed) continue;
 
     console.log(`Submitting ${venue.name} (${venue.id}) for processing`)

@@ -1,11 +1,5 @@
 #!/usr/bin/env bash
 
-# lib
-cd ./lib
-npm ci
-npm run build
-cd ..
-
 # wetherspoons-pub-fetcher
 cd ./wetherspoons-pub-fetcher
 npm ci
