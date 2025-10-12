@@ -24,6 +24,7 @@ jobs:
       TF_VAR_influxdb_url: ${{ vars.influxdb_url }}
       TF_VAR_influxdb_org: ${{ vars.influxdb_org }}
       TF_VAR_influxdb_bucket: ${{ vars.influxdb_bucket }}
+      TF_VAR_alarm_email: ${{ secrets.alarm_email }}
 
     # Use the Bash shell regardless whether the GitHub Actions runner is ubuntu-latest, macos-latest, or windows-latest
     defaults:

@@ -75,6 +75,21 @@ resource "aws_sns_topic" "wetherspoons_pubs" {
   name = "wetherspoons-pubs"
 }
 
+resource "aws_sns_topic" "wetherspoons_alarms" {
+  name = "wetherspoons-alarms"
+}
+
+variable "alarm_email" {
+  type        = string
+  description = "Email address to receive CloudWatch alarm notifications"
+}
+
+resource "aws_sns_topic_subscription" "wetherspoons_alarms_email" {
+  topic_arn = aws_sns_topic.wetherspoons_alarms.arn
+  protocol  = "email"
+  endpoint  = var.alarm_email
+}
+
 resource "aws_sqs_queue" "wetherspoons_queue" {
   name                       = "wetherspoons-queue"
   message_retention_seconds  = 43200
@@ -88,8 +103,9 @@ resource "aws_sns_topic_subscription" "wetherspoons_pubs_sqs_target" {
 }
 
 module "wetherspoons_pub_fetcher" {
-  source        = "./wetherspoons-pub-fetcher"
-  sns_topic_arn = aws_sns_topic.wetherspoons_pubs.arn
+  source              = "./wetherspoons-pub-fetcher"
+  sns_topic_arn       = aws_sns_topic.wetherspoons_pubs.arn
+  alarm_sns_topic_arn = aws_sns_topic.wetherspoons_alarms.arn
 }
 
 module "wetherspoons_pub_ranker" {
@@ -103,6 +119,7 @@ module "wetherspoons_menu_fetcher" {
   influxdb_write_api_token = var.influxdb_write_api_token
   influxdb_org             = var.influxdb_org
   influxdb_bucket          = var.influxdb_bucket
+  alarm_sns_topic_arn      = aws_sns_topic.wetherspoons_alarms.arn
 }
 
 module "wetherspoons_price_api" {

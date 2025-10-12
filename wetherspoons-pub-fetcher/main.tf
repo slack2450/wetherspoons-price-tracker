@@ -2,6 +2,11 @@ variable "sns_topic_arn" {
   type = string
 }
 
+variable "alarm_sns_topic_arn" {
+  type        = string
+  description = "SNS topic ARN for CloudWatch alarms"
+}
+
 resource "aws_iam_role" "wetherspoons_pub_fetcher_role" {
   assume_role_policy = jsonencode(
     {
@@ -107,4 +112,62 @@ resource "aws_lambda_permission" "wetherspoons_pub_fetcher" {
   principal     = "events.amazonaws.com"
   function_name = aws_lambda_function.wetherspoons_pub_fetcher.function_name
   source_arn    = aws_cloudwatch_event_rule.every_hour.arn
+}
+
+# CloudWatch metric filter for errors
+resource "aws_cloudwatch_log_metric_filter" "pub_fetcher_errors" {
+  name           = "pub-fetcher-errors"
+  log_group_name = aws_cloudwatch_log_group.wetherspoons_pub_fetcher.name
+  pattern        = "[ERROR]"
+
+  metric_transformation {
+    name          = "PubFetcherErrors"
+    namespace     = "WetherspoonsPriceTracker"
+    value         = "1"
+    default_value = 0
+  }
+}
+
+# CloudWatch alarm for error rate > 10%
+resource "aws_cloudwatch_metric_alarm" "pub_fetcher_error_rate" {
+  alarm_name          = "pub-fetcher-error-rate-high"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 2
+  threshold           = 10
+  alarm_description   = "This metric monitors pub-fetcher error rate"
+  alarm_actions       = [var.alarm_sns_topic_arn]
+  treat_missing_data  = "notBreaching"
+
+  metric_query {
+    id          = "error_rate"
+    expression  = "(errors / invocations) * 100"
+    label       = "Error Rate"
+    return_data = true
+  }
+
+  metric_query {
+    id = "errors"
+    metric {
+      metric_name = "Errors"
+      namespace   = "AWS/Lambda"
+      period      = 300
+      stat        = "Sum"
+      dimensions = {
+        FunctionName = aws_lambda_function.wetherspoons_pub_fetcher.function_name
+      }
+    }
+  }
+
+  metric_query {
+    id = "invocations"
+    metric {
+      metric_name = "Invocations"
+      namespace   = "AWS/Lambda"
+      period      = 300
+      stat        = "Sum"
+      dimensions = {
+        FunctionName = aws_lambda_function.wetherspoons_pub_fetcher.function_name
+      }
+    }
+  }
 }
