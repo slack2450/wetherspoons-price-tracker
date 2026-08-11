@@ -4,7 +4,7 @@
   },
   "name": "wetherspoons-price-tracker",
   "description": "This repository contains the code for some AWS Lambda functions to track the price of every drink in every Wetherspoons pub.",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "main": "index.js",
   "scripts": {
     "terraform-format": "terraform fmt -check -recursive ."

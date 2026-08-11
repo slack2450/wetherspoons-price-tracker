@@ -1,6 +1,6 @@
 {
   "name": "wetherspoons-menu-fetcher",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "",
   "main": "index.js",
   "scripts": {
@@ -11,7 +11,7 @@
   "license": "UNLICENSED",
   "dependencies": {
     "@influxdata/influxdb-client": "^1.35.0",
-    "wetherspoons-api": "^0.0.7"
+    "wetherspoons-api": "^1.1.1"
   },
   "devDependencies": {
     "@babel/core": "^7.28.4",
