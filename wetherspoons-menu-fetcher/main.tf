@@ -23,6 +23,14 @@ variable "alarm_sns_topic_arn" {
   description = "SNS topic ARN for CloudWatch alarms"
 }
 
+variable "run_table_arn" {
+  type = string
+}
+
+variable "run_table_name" {
+  type = string
+}
+
 resource "aws_iam_role" "wetherspoons_menu_fetcher_role" {
   name = "wetherspoons-menu-fetcher-role"
 
@@ -79,6 +87,21 @@ resource "aws_iam_role_policy" "wetherspoons_menu_fetcher_sqs" {
   )
 }
 
+resource "aws_iam_role_policy" "wetherspoons_menu_fetcher_runs" {
+  name = "run-ledger"
+  role = aws_iam_role.wetherspoons_menu_fetcher_role.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action = [
+        "dynamodb:UpdateItem",
+      ]
+      Effect   = "Allow"
+      Resource = var.run_table_arn
+    }]
+  })
+}
+
 resource "aws_lambda_function" "wetherspoons_menu_fetcher" {
   architectures = [
     "arm64",
@@ -100,6 +123,7 @@ resource "aws_lambda_function" "wetherspoons_menu_fetcher" {
       INFLUXDB_WRITE_API_TOKEN = var.influxdb_write_api_token
       INFLUXDB_ORG             = var.influxdb_org
       INFLUXDB_BUCKET          = var.influxdb_bucket
+      RUN_TABLE_NAME           = var.run_table_name
     }
   }
 
@@ -144,8 +168,40 @@ resource "aws_iam_role_policy_attachment" "wetherspoons_menu_fetcher" {
 resource "aws_lambda_event_source_mapping" "sqs_trigger" {
   event_source_arn                   = var.sqs_arn
   function_name                      = aws_lambda_function.wetherspoons_menu_fetcher.function_name
-  batch_size                         = 10
-  maximum_batching_window_in_seconds = 5
+  batch_size                         = 5
+  maximum_batching_window_in_seconds = 0
+  function_response_types            = ["ReportBatchItemFailures"]
+
+  scaling_config {
+    maximum_concurrency = 5
+  }
+}
+
+resource "aws_cloudwatch_log_metric_filter" "menu_record_failures" {
+  name           = "menu-record-failures"
+  log_group_name = aws_cloudwatch_log_group.wetherspoons_menu_fetcher.name
+  pattern        = "MENU_RECORD_FAILED"
+
+  metric_transformation {
+    name          = "MenuRecordFailures"
+    namespace     = "WetherspoonsPriceTracker"
+    value         = "1"
+    default_value = 0
+  }
+}
+
+resource "aws_cloudwatch_metric_alarm" "menu_record_failures" {
+  alarm_name          = "menu-record-failures"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 1
+  threshold           = 0
+  alarm_description   = "One or more individual pub menu records failed and will be retried"
+  alarm_actions       = [var.alarm_sns_topic_arn]
+  treat_missing_data  = "notBreaching"
+  namespace           = "WetherspoonsPriceTracker"
+  metric_name         = "MenuRecordFailures"
+  period              = 300
+  statistic           = "Sum"
 }
 
 # CloudWatch metric filter for errors

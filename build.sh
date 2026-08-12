@@ -30,6 +30,14 @@ cd ..
 # wetherspoons-menu-fetcher
 cd ./wetherspoons-menu-fetcher
 npm ci
+npm test
+npm run build
+assert_lambda_bundle ./dist
+cd ..
+
+# wetherspoons-run-monitor
+cd ./wetherspoons-run-monitor
+npm ci
 npm run build
 assert_lambda_bundle ./dist
 cd ..

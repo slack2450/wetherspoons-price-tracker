@@ -1,18 +1,16 @@
 {
-  "name": "wetherspoons-pub-fetcher",
-  "version": "1.0.1",
-  "description": "",
+  "name": "wetherspoons-run-monitor",
+  "version": "1.0.0",
+  "private": true,
   "main": "app.js",
   "scripts": {
-    "build": "webpack --mode production && cd dist && zip index.zip *.js",
-    "build:dev": "webpack --mode development"
+    "build": "webpack --mode production && cd dist && zip index.zip *.js"
   },
-  "author": "Joss Bird",
   "license": "UNLICENSED",
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.1108.0",
     "@aws-sdk/client-sns": "^3.1108.0",
-    "wetherspoons-api": "^2.0.0"
+    "@aws-sdk/client-sqs": "^3.1108.0"
   },
   "devDependencies": {
     "@babel/core": "^7.28.4",

@@ -7,6 +7,14 @@ variable "alarm_sns_topic_arn" {
   description = "SNS topic ARN for CloudWatch alarms"
 }
 
+variable "run_table_arn" {
+  type = string
+}
+
+variable "run_table_name" {
+  type = string
+}
+
 resource "aws_iam_role" "wetherspoons_pub_fetcher_role" {
   assume_role_policy = jsonencode(
     {
@@ -43,6 +51,22 @@ resource "aws_iam_role_policy" "wetherspoons_pub_fetcher_sns" {
   )
 }
 
+resource "aws_iam_role_policy" "wetherspoons_pub_fetcher_runs" {
+  name = "run-ledger"
+  role = aws_iam_role.wetherspoons_pub_fetcher_role.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action = [
+        "dynamodb:PutItem",
+        "dynamodb:UpdateItem",
+      ]
+      Effect   = "Allow"
+      Resource = var.run_table_arn
+    }]
+  })
+}
+
 resource "aws_lambda_function" "wetherspoons_pub_fetcher" {
   architectures = [
     "arm64",
@@ -57,6 +81,13 @@ resource "aws_lambda_function" "wetherspoons_pub_fetcher" {
   role                           = aws_iam_role.wetherspoons_pub_fetcher_role.arn
   runtime                        = "nodejs24.x"
   timeout                        = 120
+
+  environment {
+    variables = {
+      PUBS_TOPIC_ARN = var.sns_topic_arn
+      RUN_TABLE_NAME = var.run_table_name
+    }
+  }
 
   ephemeral_storage {
     size = 512

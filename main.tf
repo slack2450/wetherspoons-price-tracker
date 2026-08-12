@@ -79,6 +79,22 @@ resource "aws_sns_topic" "wetherspoons_alarms" {
   name = "wetherspoons-alarms"
 }
 
+resource "aws_dynamodb_table" "wetherspoons_runs" {
+  name         = "wetherspoons-runs"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "runId"
+
+  attribute {
+    name = "runId"
+    type = "S"
+  }
+
+  ttl {
+    attribute_name = "expiresAt"
+    enabled        = true
+  }
+}
+
 variable "alarm_email" {
   type        = string
   description = "Email address to receive CloudWatch alarm notifications"
@@ -90,10 +106,42 @@ resource "aws_sns_topic_subscription" "wetherspoons_alarms_email" {
   endpoint  = var.alarm_email
 }
 
+resource "aws_sqs_queue" "wetherspoons_dead_letter_queue" {
+  name                      = "wetherspoons-dead-letter-queue"
+  message_retention_seconds = 1209600
+}
+
 resource "aws_sqs_queue" "wetherspoons_queue" {
   name                       = "wetherspoons-queue"
-  message_retention_seconds  = 43200
-  visibility_timeout_seconds = 60
+  message_retention_seconds  = 345600
+  visibility_timeout_seconds = 900
+  redrive_policy = jsonencode({
+    deadLetterTargetArn = aws_sqs_queue.wetherspoons_dead_letter_queue.arn
+    maxReceiveCount     = 5
+  })
+}
+
+data "aws_iam_policy_document" "wetherspoons_queue" {
+  statement {
+    actions   = ["sqs:SendMessage"]
+    resources = [aws_sqs_queue.wetherspoons_queue.arn]
+
+    principals {
+      type        = "Service"
+      identifiers = ["sns.amazonaws.com"]
+    }
+
+    condition {
+      test     = "ArnEquals"
+      variable = "aws:SourceArn"
+      values   = [aws_sns_topic.wetherspoons_pubs.arn]
+    }
+  }
+}
+
+resource "aws_sqs_queue_policy" "wetherspoons_queue" {
+  queue_url = aws_sqs_queue.wetherspoons_queue.id
+  policy    = data.aws_iam_policy_document.wetherspoons_queue.json
 }
 
 resource "aws_sns_topic_subscription" "wetherspoons_pubs_sqs_target" {
@@ -106,6 +154,8 @@ module "wetherspoons_pub_fetcher" {
   source              = "./wetherspoons-pub-fetcher"
   sns_topic_arn       = aws_sns_topic.wetherspoons_pubs.arn
   alarm_sns_topic_arn = aws_sns_topic.wetherspoons_alarms.arn
+  run_table_arn       = aws_dynamodb_table.wetherspoons_runs.arn
+  run_table_name      = aws_dynamodb_table.wetherspoons_runs.name
 }
 
 module "wetherspoons_pub_ranker" {
@@ -120,6 +170,34 @@ module "wetherspoons_menu_fetcher" {
   influxdb_org             = var.influxdb_org
   influxdb_bucket          = var.influxdb_bucket
   alarm_sns_topic_arn      = aws_sns_topic.wetherspoons_alarms.arn
+  run_table_arn            = aws_dynamodb_table.wetherspoons_runs.arn
+  run_table_name           = aws_dynamodb_table.wetherspoons_runs.name
+}
+
+module "wetherspoons_run_monitor" {
+  source              = "./wetherspoons-run-monitor"
+  alarm_sns_topic_arn = aws_sns_topic.wetherspoons_alarms.arn
+  dlq_arn             = aws_sqs_queue.wetherspoons_dead_letter_queue.arn
+  dlq_url             = aws_sqs_queue.wetherspoons_dead_letter_queue.id
+  run_table_arn       = aws_dynamodb_table.wetherspoons_runs.arn
+  run_table_name      = aws_dynamodb_table.wetherspoons_runs.name
+}
+
+resource "aws_cloudwatch_metric_alarm" "dead_letter_queue_not_empty" {
+  alarm_name          = "wetherspoons-dead-letter-queue-not-empty"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 1
+  threshold           = 0
+  period              = 300
+  statistic           = "Maximum"
+  namespace           = "AWS/SQS"
+  metric_name         = "ApproximateNumberOfMessagesVisible"
+  alarm_actions       = [aws_sns_topic.wetherspoons_alarms.arn]
+  treat_missing_data  = "notBreaching"
+
+  dimensions = {
+    QueueName = aws_sqs_queue.wetherspoons_dead_letter_queue.name
+  }
 }
 
 module "wetherspoons_price_api" {

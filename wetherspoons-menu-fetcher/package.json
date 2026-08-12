@@ -5,13 +5,15 @@
   "main": "index.js",
   "scripts": {
     "build": "webpack --mode production && cd dist && zip index.zip *.js",
-    "build:dev": "webpack --mode development && cd dist && zip index.zip index.js"
+    "build:dev": "webpack --mode development && cd dist && zip index.zip index.js",
+    "test": "vitest run"
   },
   "author": "Joss Bird",
   "license": "UNLICENSED",
   "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.1108.0",
     "@influxdata/influxdb-client": "^1.35.0",
-    "wetherspoons-api": "^1.1.2"
+    "wetherspoons-api": "^2.0.0"
   },
   "devDependencies": {
     "@babel/core": "^7.28.4",
@@ -22,6 +24,7 @@
     "fork-ts-checker-webpack-plugin": "^9.1.0",
     "node-prune": "^1.0.2",
     "typescript": "^5.9.3",
+    "vitest": "^3.2.7",
     "webpack": "^5.102.1",
     "webpack-cli": "^6.0.1"
   }
