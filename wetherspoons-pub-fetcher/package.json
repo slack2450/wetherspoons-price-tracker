@@ -4,14 +4,14 @@
   "description": "",
   "main": "app.js",
   "scripts": {
-    "build": "webpack --mode production && cd dist && zip index.zip index.js",
+    "build": "webpack --mode production && cd dist && zip index.zip *.js",
     "build:dev": "webpack --mode development"
   },
   "author": "Joss Bird",
   "license": "UNLICENSED",
   "dependencies": {
     "@aws-sdk/client-sns": "^3.131.0",
-    "wetherspoons-api": "^1.1.1"
+    "wetherspoons-api": "^1.1.2"
   },
   "devDependencies": {
     "@babel/core": "^7.28.4",

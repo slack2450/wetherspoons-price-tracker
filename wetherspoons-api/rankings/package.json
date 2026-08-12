@@ -5,7 +5,7 @@
   "author": "Joss Bird",
   "license": "UNLICENSED",
   "scripts": {
-    "build": "webpack --mode production && cd dist && zip index.zip index.js",
+    "build": "webpack --mode production && cd dist && zip index.zip *.js",
     "build:dev": "webpack --mode development"
   },
   "devDependencies": {
