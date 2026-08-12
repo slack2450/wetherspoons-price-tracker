@@ -2,7 +2,7 @@ terraform {
   required_providers {
     aws = {
       source  = "hashicorp/aws"
-      version = "~> 5.62"
+      version = "~> 6.21.0"
     }
     cloudflare = {
       source  = "cloudflare/cloudflare"
@@ -260,4 +260,3 @@ module "rankings" {
   aws_secret_key = var.aws_secret_key
   api_id         = aws_apigatewayv2_api.wetherspoons_api.id
 }
-
