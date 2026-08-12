@@ -170,7 +170,7 @@ resource "aws_cloudwatch_metric_alarm" "menu_fetcher_error_rate" {
   threshold           = 10
   alarm_description   = "This metric monitors menu-fetcher error rate"
   alarm_actions       = [var.alarm_sns_topic_arn]
-  treat_missing_data  = "notBreaching"
+  treat_missing_data  = "ignore"
 
   metric_query {
     id          = "error_rate"
