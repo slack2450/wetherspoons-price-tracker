@@ -136,7 +136,7 @@ resource "aws_cloudwatch_metric_alarm" "pub_fetcher_error_rate" {
   threshold           = 10
   alarm_description   = "This metric monitors pub-fetcher error rate"
   alarm_actions       = [var.alarm_sns_topic_arn]
-  treat_missing_data  = "ignore"
+  treat_missing_data  = "notBreaching"
 
   metric_query {
     id          = "error_rate"
