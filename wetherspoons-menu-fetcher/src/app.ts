@@ -179,7 +179,19 @@ export async function handle(
     if (result.status === 'fulfilled') return;
     const record = event.Records[index];
     if (!record) return;
-    console.error(`MENU_RECORD_FAILED messageId=${record.messageId}`, result.reason);
+    const receiveCount = Number(record.attributes.ApproximateReceiveCount ?? 1);
+    const maxReceiveCount = Number(process.env.MAX_RECEIVE_COUNT ?? 5);
+    if (receiveCount >= maxReceiveCount) {
+      console.error(
+        `MENU_RECORD_FAILED messageId=${record.messageId} attempts=${receiveCount}`,
+        result.reason,
+      );
+    } else {
+      console.warn(
+        `MENU_RECORD_RETRY messageId=${record.messageId} attempt=${receiveCount}/${maxReceiveCount}`,
+        result.reason,
+      );
+    }
     batchItemFailures.push({ itemIdentifier: record.messageId });
   });
 

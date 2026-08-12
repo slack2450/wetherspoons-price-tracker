@@ -85,6 +85,22 @@ describe('menu fetcher', () => {
     expect(dependencies.markTerminal).toHaveBeenCalledTimes(1);
   });
 
+  it('only logs a record failure after SQS retries are exhausted', async () => {
+    const dependencies = unavailableDependencies();
+    dependencies.getDrinks = vi.fn(async () => { throw new Error('upstream failed'); });
+    const finalAttempt = record('failure');
+    finalAttempt.attributes.ApproximateReceiveCount = '5';
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    await handle({ Records: [finalAttempt] } as SQSEvent, dependencies);
+
+    expect(error).toHaveBeenCalledWith(
+      'MENU_RECORD_FAILED messageId=failure attempts=5',
+      expect.any(Error),
+    );
+    error.mockRestore();
+  });
+
   it('does not mark a venue terminal when the Influx flush fails', async () => {
     const dependencies = unavailableDependencies();
     dependencies.getDrinks = vi.fn(async () => ({

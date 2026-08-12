@@ -111,13 +111,17 @@ resource "aws_sqs_queue" "wetherspoons_dead_letter_queue" {
   message_retention_seconds = 1209600
 }
 
+locals {
+  menu_max_receive_count = 5
+}
+
 resource "aws_sqs_queue" "wetherspoons_queue" {
   name                       = "wetherspoons-queue"
   message_retention_seconds  = 345600
   visibility_timeout_seconds = 900
   redrive_policy = jsonencode({
     deadLetterTargetArn = aws_sqs_queue.wetherspoons_dead_letter_queue.arn
-    maxReceiveCount     = 5
+    maxReceiveCount     = local.menu_max_receive_count
   })
 }
 
@@ -172,6 +176,7 @@ module "wetherspoons_menu_fetcher" {
   alarm_sns_topic_arn      = aws_sns_topic.wetherspoons_alarms.arn
   run_table_arn            = aws_dynamodb_table.wetherspoons_runs.arn
   run_table_name           = aws_dynamodb_table.wetherspoons_runs.name
+  max_receive_count        = local.menu_max_receive_count
 }
 
 module "wetherspoons_run_monitor" {

@@ -31,6 +31,11 @@ variable "run_table_name" {
   type = string
 }
 
+variable "max_receive_count" {
+  type        = number
+  description = "Number of SQS receives before an individual venue is sent to the DLQ"
+}
+
 resource "aws_iam_role" "wetherspoons_menu_fetcher_role" {
   name = "wetherspoons-menu-fetcher-role"
 
@@ -124,6 +129,7 @@ resource "aws_lambda_function" "wetherspoons_menu_fetcher" {
       INFLUXDB_ORG             = var.influxdb_org
       INFLUXDB_BUCKET          = var.influxdb_bucket
       RUN_TABLE_NAME           = var.run_table_name
+      MAX_RECEIVE_COUNT        = tostring(var.max_receive_count)
     }
   }
 
@@ -222,42 +228,16 @@ resource "aws_cloudwatch_log_metric_filter" "menu_fetcher_errors" {
 resource "aws_cloudwatch_metric_alarm" "menu_fetcher_error_rate" {
   alarm_name          = "menu-fetcher-error-rate-high"
   comparison_operator = "GreaterThanThreshold"
-  evaluation_periods  = 2
-  threshold           = 10
-  alarm_description   = "This metric monitors menu-fetcher error rate"
+  evaluation_periods  = 1
+  threshold           = 0
+  alarm_description   = "The menu-fetcher Lambda invocation failed unexpectedly"
   alarm_actions       = [var.alarm_sns_topic_arn]
   treat_missing_data  = "notBreaching"
-
-  metric_query {
-    id          = "error_rate"
-    expression  = "(errors / invocations) * 100"
-    label       = "Error Rate"
-    return_data = true
-  }
-
-  metric_query {
-    id = "errors"
-    metric {
-      metric_name = "Errors"
-      namespace   = "AWS/Lambda"
-      period      = 300
-      stat        = "Sum"
-      dimensions = {
-        FunctionName = aws_lambda_function.wetherspoons_menu_fetcher.function_name
-      }
-    }
-  }
-
-  metric_query {
-    id = "invocations"
-    metric {
-      metric_name = "Invocations"
-      namespace   = "AWS/Lambda"
-      period      = 300
-      stat        = "Sum"
-      dimensions = {
-        FunctionName = aws_lambda_function.wetherspoons_menu_fetcher.function_name
-      }
-    }
+  namespace           = "AWS/Lambda"
+  metric_name         = "Errors"
+  period              = 300
+  statistic           = "Sum"
+  dimensions = {
+    FunctionName = aws_lambda_function.wetherspoons_menu_fetcher.function_name
   }
 }
