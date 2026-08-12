@@ -27,6 +27,11 @@ async function allRuns(): Promise<Record<string, AttributeValue>[]> {
 
 export const handler = async (): Promise<void> => {
   const now = Date.now();
+  const londonHour = Number(new Intl.DateTimeFormat('en-GB', {
+    hour: '2-digit',
+    hourCycle: 'h23',
+    timeZone: 'Europe/London',
+  }).format(new Date(now)));
   const runs = await allRuns();
   const staleRuns = runs.filter(run => (
     run.status?.S !== 'COMPLETE'
@@ -41,7 +46,12 @@ export const handler = async (): Promise<void> => {
   const inFlight = Number(queue.Attributes?.ApproximateNumberOfMessagesNotVisible ?? 0);
 
   const problems: string[] = [];
-  if (!hasRecentRun) problems.push('No collection run started in the last 90 minutes.');
+  // Collections are scheduled hourly from 08:00 through 23:00 London time.
+  // Outside that window, keep checking incomplete runs and the DLQ without
+  // reporting the intentional overnight gap as a missed run.
+  if (londonHour >= 8 && !hasRecentRun) {
+    problems.push('No collection run started in the last 90 minutes during operational hours.');
+  }
   if (visible + inFlight > 0) {
     problems.push(`Dead-letter queue contains ${visible} visible and ${inFlight} in-flight messages.`);
   }

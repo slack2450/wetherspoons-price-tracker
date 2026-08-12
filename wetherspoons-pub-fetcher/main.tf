@@ -127,22 +127,55 @@ resource "aws_iam_role_policy_attachment" "wetherspoons_pub_fetcher" {
   policy_arn = aws_iam_policy.wetherspoons_pub_fetcher.arn
 }
 
-resource "aws_cloudwatch_event_rule" "every_hour" {
-  name                = "every-hour"
-  schedule_expression = "cron(0 * ? * * *)"
+resource "aws_iam_role" "scheduler" {
+  name = "wetherspoons-pub-fetcher-scheduler-role"
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action = "sts:AssumeRole"
+      Effect = "Allow"
+      Principal = {
+        Service = "scheduler.amazonaws.com"
+      }
+    }]
+  })
 }
 
-resource "aws_cloudwatch_event_target" "wetherspoons_pub_fetcher" {
-  rule = aws_cloudwatch_event_rule.every_hour.name
-  arn  = aws_lambda_function.wetherspoons_pub_fetcher.arn
+resource "aws_iam_role_policy" "scheduler" {
+  name = "invoke-pub-fetcher"
+  role = aws_iam_role.scheduler.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action   = "lambda:InvokeFunction"
+      Effect   = "Allow"
+      Resource = aws_lambda_function.wetherspoons_pub_fetcher.arn
+    }]
+  })
 }
 
-resource "aws_lambda_permission" "wetherspoons_pub_fetcher" {
-  statement_id  = "AllowExecutionFromCloudWatch"
-  action        = "lambda:InvokeFunction"
-  principal     = "events.amazonaws.com"
-  function_name = aws_lambda_function.wetherspoons_pub_fetcher.function_name
-  source_arn    = aws_cloudwatch_event_rule.every_hour.arn
+resource "aws_scheduler_schedule" "operational_hours" {
+  name                         = "wetherspoons-operational-hours"
+  schedule_expression          = "cron(0 8-23 * * ? *)"
+  schedule_expression_timezone = "Europe/London"
+
+  flexible_time_window {
+    mode = "OFF"
+  }
+
+  target {
+    arn      = aws_lambda_function.wetherspoons_pub_fetcher.arn
+    role_arn = aws_iam_role.scheduler.arn
+    input = jsonencode({
+      id   = "<aws.scheduler.scheduled-time>"
+      time = "<aws.scheduler.scheduled-time>"
+    })
+
+    retry_policy {
+      maximum_event_age_in_seconds = 3600
+      maximum_retry_attempts       = 2
+    }
+  }
 }
 
 # CloudWatch metric filter for errors
