@@ -13,7 +13,7 @@
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.1108.0",
     "@influxdata/influxdb-client": "^1.35.0",
-    "wetherspoons-api": "^2.1.0"
+    "wetherspoons-api": "^2.1.1"
   },
   "devDependencies": {
     "@babel/core": "^7.28.4",
