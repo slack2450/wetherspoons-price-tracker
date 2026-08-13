@@ -1,0 +1,40 @@
+name: Cleanup invalid Scheduler run
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: Type PURGE_INVALID_SCHEDULER_RUN to confirm
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  cleanup:
+    if: inputs.confirmation == 'PURGE_INVALID_SCHEDULER_RUN'
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.aws_access_key }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.aws_secret_key }}
+      AWS_DEFAULT_REGION: eu-west-2
+      DLQ_URL: https://sqs.eu-west-2.amazonaws.com/729049610945/wetherspoons-dead-letter-queue
+
+    steps:
+      - name: Show poison-message count
+        run: |
+          aws sqs get-queue-attributes \
+            --queue-url "$DLQ_URL" \
+            --attribute-names ApproximateNumberOfMessages
+
+      - name: Purge poison messages
+        run: aws sqs purge-queue --queue-url "$DLQ_URL"
+
+      - name: Delete corrupt run ledger
+        run: |
+          aws dynamodb delete-item \
+            --table-name wetherspoons-runs \
+            --key '{"runId":{"S":"<aws.scheduler.scheduled-time>"}}' \
+            --return-values ALL_OLD

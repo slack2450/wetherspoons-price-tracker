@@ -61,6 +61,10 @@ async function createRun(
 }
 
 export const handler = async (event: ScheduleEvent = {}): Promise<void> => {
+  if (event.time !== undefined && Number.isNaN(Date.parse(event.time))) {
+    throw new Error(`Schedule event contained an invalid time: ${event.time}`);
+  }
+
   const runId = event.id ?? randomUUID();
   const observedAt = event.time ?? new Date().toISOString();
   const highLevelVenues = (await venues()).filter(venue => !venue.isClosed);
