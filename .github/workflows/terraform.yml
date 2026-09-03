@@ -58,6 +58,13 @@ jobs:
     - name: Terraform Format
       run: terraform fmt -check -recursive
 
+    - name: Verify collectors are quiescent before deployment
+      if: inputs.phase == 'deploy'
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_KEY }}
+      run: scripts/verify-quiescence.sh
+
     # Save exactly the plan that the next step applies. Quiesce changes only
     # the scheduler; deploy keeps it disabled; resume re-enables it last.
     - name: Terraform Plan
@@ -107,6 +114,13 @@ jobs:
         TF_VAR_influxdb_bucket: ${{ vars.influxdb_bucket }}
         TF_VAR_alarm_email: ${{ secrets.alarm_email }}
       run: terraform apply -auto-approve -input=false tfplan
+
+    - name: Wait for collectors to drain
+      if: inputs.phase == 'quiesce'
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_KEY }}
+      run: scripts/verify-quiescence.sh
 
     - name: Smoke-test real deployed API
       if: inputs.phase == 'deploy'
