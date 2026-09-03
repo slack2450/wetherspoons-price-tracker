@@ -1,9 +1,12 @@
 'use strict';
 
+import './runtime-token';
+
 import { randomUUID } from 'node:crypto';
-import { DynamoDBClient, PutItemCommand, UpdateItemCommand } from '@aws-sdk/client-dynamodb';
+import { DynamoDBClient, UpdateItemCommand } from '@aws-sdk/client-dynamodb';
 import { PublishCommand, SNSClient } from '@aws-sdk/client-sns';
 import { venues } from 'wetherspoons-api';
+import { beginRun, markPublishFailed } from './run-ledger';
 
 const region = 'eu-west-2';
 const dynamodb = new DynamoDBClient({ region });
@@ -16,48 +19,6 @@ interface ScheduleEvent {
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
-}
-
-async function createRun(
-  runId: string,
-  observedAt: string,
-  expectedVenueIds: string[],
-): Promise<void> {
-  try {
-    await dynamodb.send(new PutItemCommand({
-      TableName: process.env.RUN_TABLE_NAME!,
-      ConditionExpression: 'attribute_not_exists(runId)',
-      Item: {
-        runId: { S: runId },
-        observedAt: { S: observedAt },
-        startedAt: { N: Date.now().toString() },
-        expiresAt: { N: Math.floor(Date.now() / 1000 + 7 * 24 * 60 * 60).toString() },
-        status: { S: 'PROCESSING' },
-        expectedCount: { N: expectedVenueIds.length.toString() },
-        expectedVenues: { SS: expectedVenueIds },
-        processedCount: { N: '0' },
-        writtenCount: { N: '0' },
-        unavailableCount: { N: '0' },
-      },
-    }));
-  } catch (error) {
-    if ((error as { name?: string }).name !== 'ConditionalCheckFailedException') {
-      throw error;
-    }
-
-    // EventBridge retries reuse the event ID. Retaining the existing ledger makes
-    // republishing safe because menu writes use the run's fixed timestamp.
-    await dynamodb.send(new UpdateItemCommand({
-      TableName: process.env.RUN_TABLE_NAME!,
-      Key: { runId: { S: runId } },
-      UpdateExpression: 'SET #status = :processing, lastUpdatedAt = :now',
-      ExpressionAttributeNames: { '#status': 'status' },
-      ExpressionAttributeValues: {
-        ':processing': { S: 'PROCESSING' },
-        ':now': { N: Date.now().toString() },
-      },
-    }));
-  }
 }
 
 export const handler = async (event: ScheduleEvent = {}): Promise<void> => {
@@ -73,11 +34,16 @@ export const handler = async (event: ScheduleEvent = {}): Promise<void> => {
     throw new Error('Wetherspoons returned zero open pubs');
   }
 
-  await createRun(
+  const shouldPublish = await beginRun(
     runId,
     observedAt,
     highLevelVenues.map(venue => venue.venueRef.toString()),
   );
+
+  if (!shouldPublish) {
+    console.log(`RUN_ALREADY_COMPLETE runId=${runId}`);
+    return;
+  }
 
   console.log(`RUN_STARTED runId=${runId} observedAt=${observedAt} expected=${highLevelVenues.length}`);
 
@@ -101,17 +67,13 @@ export const handler = async (event: ScheduleEvent = {}): Promise<void> => {
     }));
     console.log(`RUN_PUBLISHED runId=${runId} count=${highLevelVenues.length}`);
   } catch (error) {
-    await dynamodb.send(new UpdateItemCommand({
-      TableName: process.env.RUN_TABLE_NAME!,
-      Key: { runId: { S: runId } },
-      UpdateExpression: 'SET #status = :failed, lastError = :error, lastUpdatedAt = :now',
-      ExpressionAttributeNames: { '#status': 'status' },
-      ExpressionAttributeValues: {
-        ':failed': { S: 'PUBLISH_FAILED' },
-        ':error': { S: errorMessage(error).slice(0, 1000) },
-        ':now': { N: Date.now().toString() },
-      },
-    }));
+    try {
+      await markPublishFailed(runId, errorMessage(error));
+    } catch (ledgerError) {
+      if ((ledgerError as { name?: string }).name !== 'ConditionalCheckFailedException') {
+        console.error(`RUN_FAILURE_STATUS_UPDATE_FAILED runId=${runId}`, ledgerError);
+      }
+    }
     throw error;
   }
 };

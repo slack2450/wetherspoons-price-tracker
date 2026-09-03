@@ -15,11 +15,21 @@ variable "influxdb_url" {
 }
 
 variable "influxdb_read_api_token" {
-  type = string
+  type      = string
+  sensitive = true
 }
 
 variable "influxdb_org" {
   type = string
+}
+
+variable "influxdb_bucket" {
+  type = string
+}
+
+variable "origin_verify_secret" {
+  type      = string
+  sensitive = true
 }
 
 terraform {
@@ -72,7 +82,7 @@ resource "aws_lambda_function" "wetherspoons_price_api" {
   source_code_hash               = filebase64sha256("${path.module}/dist/index.zip")
   handler                        = "index.handler"
   memory_size                    = 128
-  reserved_concurrent_executions = -1
+  reserved_concurrent_executions = 5
   role                           = aws_iam_role.api_role.arn
   runtime                        = "nodejs24.x"
   timeout                        = 30
@@ -82,6 +92,8 @@ resource "aws_lambda_function" "wetherspoons_price_api" {
       INFLUXDB_URL            = var.influxdb_url
       INFLUXDB_READ_API_TOKEN = var.influxdb_read_api_token
       INFLUXDB_ORG            = var.influxdb_org
+      INFLUXDB_BUCKET         = var.influxdb_bucket
+      API_ORIGIN_SECRET       = var.origin_verify_secret
     }
   }
 
@@ -140,5 +152,5 @@ resource "aws_lambda_permission" "wetherspoons_api_price_route_permission" {
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.wetherspoons_price_api.function_name
   principal     = "apigateway.amazonaws.com"
-  source_arn    = "arn:aws:execute-api:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:${var.api_id}/*/*/v2/price/{venueId}/{productId}"
+  source_arn    = "arn:aws:execute-api:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:${var.api_id}/*/*/v2/price/{venueId}/{productId}"
 }

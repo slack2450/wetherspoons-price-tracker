@@ -1,145 +1,56 @@
 'use strict';
 
-import { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from 'aws-lambda';
-import { ReasonPhrases, StatusCodes } from 'http-status-codes';
+import { timingSafeEqual } from 'node:crypto';
+import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from 'aws-lambda';
+import { createHistoryReader } from './history';
+import type { HistoryReader } from './history';
+import { parsePriceRequest, RequestError } from './request';
 
-import { InfluxDB } from '@influxdata/influxdb-client'
+let defaultReader: HistoryReader | undefined;
 
-const influxDB = new InfluxDB({ url: process.env.INFLUXDB_URL!, token: process.env.INFLUXDB_READ_API_TOKEN! })
+type JsonResponse = {
+  statusCode: number
+  headers: Record<string, string>
+  body: string
+};
 
-const queryApi = influxDB.getQueryApi(process.env.INFLUXDB_ORG!);
-
-console.log('Fetching productIds');
-const fetchProductIds = new Promise<Set<string>>((resolve, reject) => {
-  const productIds = new Set<string>();
-
-  queryApi.queryRows(`
-import "influxdata/influxdb/schema"
-
-schema.tagValues(
-  bucket: "raw",
-  tag: "productId",
-  start: -1d,
-  stop: now()
-)
-`
-    , {
-      next(row, tableMetadata) {
-        const o = tableMetadata.toObject(row);
-        productIds.add(o._value)
-      },
-      error(error: Error) {
-        reject(error)
-      },
-      complete() {
-        console.log(`Fetched ${productIds.size} productIds`)
-        resolve(productIds)
-      }
-    });
-});
-
-console.log('Fetching venueIds');
-const fetchVenueIds = new Promise<Set<string>>((resolve, reject) => {
-  const venueIds = new Set<string>();
-
-  queryApi.queryRows(`import "influxdata/influxdb/schema"
-
-schema.tagValues(
-  bucket: "raw",
-  tag: "venueId",
-  start: -1d,
-  stop: now()
-)
-`
-    , {
-      next(row, tableMetadata) {
-        const o = tableMetadata.toObject(row);
-        venueIds.add(o._value)
-      },
-      error(error: Error) {
-        reject(error)
-      },
-      complete() {
-        console.log(`Fetched ${venueIds.size} venueIds`)
-        resolve(venueIds)
-      }
-    });
-});
-
-export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGatewayProxyResultV2> => {
-
-  console.log(event);
-
-  if (!event.pathParameters || !event.queryStringParameters) {
-    console.error('Missing path or query string parameters');
-    return {
-      statusCode: StatusCodes.BAD_REQUEST,
-      body: ReasonPhrases.BAD_REQUEST
-    }
-  }
-
-  const pathParameters = {
-    venueId: event.pathParameters.venueId,
-    productId: event.pathParameters.productId
-  }
-  if (typeof pathParameters.venueId !== "string" || typeof pathParameters.productId !== "string") {
-    console.error('Missing venueId or productId');
-    return {
-      statusCode: StatusCodes.NOT_FOUND,
-      body: ReasonPhrases.NOT_FOUND
-    }
-  }
-  console.log('Path parameters:')
-  console.log(pathParameters)
-
-  const queryStringParameters = {
-    range: event.queryStringParameters.range
-  }
-  if (typeof queryStringParameters.range !== "string") {
-    console.error('Missing range query string')
-    return {
-      statusCode: StatusCodes.BAD_REQUEST,
-      body: ReasonPhrases.BAD_REQUEST
-    }
-  }
-  console.log('Query string parameters:')
-  console.log(queryStringParameters)
-
-  const productIds = await fetchProductIds;
-  const venueIds = await fetchVenueIds;
-
-  if (!productIds.has(pathParameters.productId) || !venueIds.has(pathParameters.venueId))
-    return {
-      statusCode: StatusCodes.NOT_FOUND,
-      body: ReasonPhrases.NOT_FOUND
-    }
-
-  const timePeriods = new Set(['24h', '7d', '30d', '1y'])
-  if (!timePeriods.has(queryStringParameters.range))
-    return {
-      statusCode: StatusCodes.BAD_REQUEST,
-      body: ReasonPhrases.BAD_REQUEST
-    }
-
-  const query = `from(bucket: "raw")
-  |> range(start: -${queryStringParameters.range}, stop: now())
-  |> filter(fn: (r) => r["productId"] == "${pathParameters.productId}")
-  |> filter(fn: (r) => r["venueId"] == "${pathParameters.venueId}")
-  |> filter(fn: (r) => r["_field"] == "price")
-  |> aggregateWindow(every: 60m, fn: mean, createEmpty: false)
-  |> drop(columns: ["venueName", "productName", "productId", "venueId","_field", "_measurement", "_start", "_stop"])`
-
-  const results = [];
-  for await (const { values, tableMeta } of queryApi.iterateRows(query)) {
-    const o = tableMeta.toObject(values);
-    results.push({
-      time: o._time,
-      price: o._value
-    })
-  }
-
+function json(statusCode: number, body: unknown): JsonResponse {
   return {
-    statusCode: StatusCodes.OK,
-    body: JSON.stringify(results)
+    statusCode,
+    headers: {
+      'content-type': 'application/json; charset=utf-8',
+      'cache-control': statusCode === 200 ? 'public, max-age=300, stale-while-revalidate=60' : 'no-store',
+    },
+    body: JSON.stringify(body),
+  };
+}
+
+function originAllowed(event: APIGatewayProxyEventV2, expectedSecret: string | undefined): boolean {
+  if (!expectedSecret) return false;
+  const supplied = event.headers?.['x-origin-verify'] ?? event.headers?.['X-Origin-Verify'];
+  if (!supplied) return false;
+  const actual = Buffer.from(supplied);
+  const expected = Buffer.from(expectedSecret);
+  return actual.length === expected.length && timingSafeEqual(actual, expected);
+}
+
+export async function handle(
+  event: APIGatewayProxyEventV2,
+  reader?: HistoryReader,
+  expectedOriginSecret = process.env.API_ORIGIN_SECRET,
+): Promise<JsonResponse> {
+  // API Gateway remains internet-addressable, so require the secret header
+  // injected by CloudFront before parsing or querying InfluxDB.
+  if (!originAllowed(event, expectedOriginSecret)) return json(403, { error: 'Forbidden' });
+  try {
+    const request = parsePriceRequest(event.pathParameters, event.queryStringParameters);
+    const selectedReader = reader ?? (defaultReader ??= createHistoryReader());
+    return json(200, await selectedReader.read(request.venueId, request.productId, request.range));
+  } catch (error) {
+    if (error instanceof RequestError) return json(error.statusCode, { error: error.message });
+    console.error('PRICE_HISTORY_FAILED', error);
+    return json(502, { error: 'Price history is temporarily unavailable' });
   }
 }
+
+export const handler = (event: APIGatewayProxyEventV2): Promise<APIGatewayProxyResultV2> => handle(event);

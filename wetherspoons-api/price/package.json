@@ -5,7 +5,8 @@
   "main": "index.js",
   "scripts": {
     "build": "webpack --mode production && cd dist && zip index.zip *.js",
-    "build:dev": "webpack --mode development"
+    "build:dev": "webpack --mode development",
+    "test": "vitest run"
   },
   "author": "Joss Bird",
   "license": "UNLICENSED",
@@ -18,6 +19,7 @@
     "fork-ts-checker-webpack-plugin": "^9.1.0",
     "node-prune": "^1.0.2",
     "typescript": "^5.9.3",
+    "vitest": "^3.2.7",
     "webpack": "^5.102.1",
     "webpack-cli": "^6.0.1"
   },

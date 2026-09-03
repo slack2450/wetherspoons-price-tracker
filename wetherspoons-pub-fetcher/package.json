@@ -5,14 +5,15 @@
   "main": "app.js",
   "scripts": {
     "build": "webpack --mode production && cd dist && zip index.zip *.js",
-    "build:dev": "webpack --mode development"
+    "build:dev": "webpack --mode development",
+    "test": "vitest run"
   },
   "author": "Joss Bird",
   "license": "UNLICENSED",
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.1108.0",
     "@aws-sdk/client-sns": "^3.1108.0",
-    "wetherspoons-api": "^2.1.1"
+    "wetherspoons-api": "2.1.1"
   },
   "devDependencies": {
     "@babel/core": "^7.28.4",
@@ -21,6 +22,7 @@
     "babel-loader": "^10.0.0",
     "fork-ts-checker-webpack-plugin": "^9.1.0",
     "typescript": "^5.9.3",
+    "vitest": "^3.2.7",
     "webpack": "^5.102.1",
     "webpack-cli": "^6.0.1"
   }

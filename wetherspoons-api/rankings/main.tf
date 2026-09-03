@@ -120,5 +120,5 @@ resource "aws_lambda_permission" "wetherspoons_api_rankings_route_permission" {
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.wetherspoons_rankings_api.function_name
   principal     = "apigateway.amazonaws.com"
-  source_arn    = "arn:aws:execute-api:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:${var.api_id}/*/*/v1/rankings"
+  source_arn    = "arn:aws:execute-api:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:${var.api_id}/*/*/v1/rankings"
 }

@@ -31,9 +31,22 @@ variable "run_table_name" {
   type = string
 }
 
+variable "menu_snapshot_bucket_arn" {
+  type = string
+}
+
+variable "menu_snapshot_bucket" {
+  type = string
+}
+
 variable "max_receive_count" {
   type        = number
   description = "Number of SQS receives before an individual venue is sent to the DLQ"
+}
+
+variable "wetherspoons_api_token" {
+  type      = string
+  sensitive = true
 }
 
 resource "aws_iam_role" "wetherspoons_menu_fetcher_role" {
@@ -64,27 +77,13 @@ resource "aws_iam_role_policy" "wetherspoons_menu_fetcher_sqs" {
         {
           Action = [
             "sqs:DeleteMessage",
-            "sqs:GetQueueUrl",
-            "sqs:ListDeadLetterSourceQueues",
             "sqs:ChangeMessageVisibility",
-            "sqs:PurgeQueue",
             "sqs:ReceiveMessage",
-            "sqs:DeleteQueue",
-            "sqs:SendMessage",
             "sqs:GetQueueAttributes",
-            "sqs:ListQueueTags",
-            "sqs:CreateQueue",
-            "sqs:SetQueueAttributes",
           ]
           Effect   = "Allow"
           Resource = var.sqs_arn
           Sid      = "VisualEditor0"
-        },
-        {
-          Action   = "sqs:ListQueues"
-          Effect   = "Allow"
-          Resource = "*"
-          Sid      = "VisualEditor1"
         },
       ]
       Version = "2012-10-17"
@@ -99,10 +98,27 @@ resource "aws_iam_role_policy" "wetherspoons_menu_fetcher_runs" {
     Version = "2012-10-17"
     Statement = [{
       Action = [
+        "dynamodb:GetItem",
         "dynamodb:UpdateItem",
       ]
       Effect   = "Allow"
       Resource = var.run_table_arn
+    }]
+  })
+}
+
+resource "aws_iam_role_policy" "wetherspoons_menu_fetcher_snapshots" {
+  name = "menu-snapshots"
+  role = aws_iam_role.wetherspoons_menu_fetcher_role.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action = [
+        "s3:GetObject",
+        "s3:PutObject",
+      ]
+      Effect   = "Allow"
+      Resource = "${var.menu_snapshot_bucket_arn}/runs/*"
     }]
   })
 }
@@ -130,6 +146,8 @@ resource "aws_lambda_function" "wetherspoons_menu_fetcher" {
       INFLUXDB_BUCKET          = var.influxdb_bucket
       RUN_TABLE_NAME           = var.run_table_name
       MAX_RECEIVE_COUNT        = tostring(var.max_receive_count)
+      MENU_SNAPSHOT_BUCKET     = var.menu_snapshot_bucket
+      WETHERSPOONS_API_TOKEN   = var.wetherspoons_api_token
     }
   }
 
