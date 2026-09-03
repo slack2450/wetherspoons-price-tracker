@@ -1,4 +1,3 @@
-import './runtime-token';
 import { timingSafeEqual } from 'node:crypto';
 import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from 'aws-lambda';
 import { getDrinks, type HighLevelVenue, venues } from 'wetherspoons-api';

@@ -15,11 +15,6 @@ variable "run_table_name" {
   type = string
 }
 
-variable "wetherspoons_api_token" {
-  type      = string
-  sensitive = true
-}
-
 variable "schedule_state" {
   type        = string
   description = "EventBridge Scheduler state; set to DISABLED while draining for a deployment"
@@ -101,9 +96,8 @@ resource "aws_lambda_function" "wetherspoons_pub_fetcher" {
 
   environment {
     variables = {
-      PUBS_TOPIC_ARN         = var.sns_topic_arn
-      RUN_TABLE_NAME         = var.run_table_name
-      WETHERSPOONS_API_TOKEN = var.wetherspoons_api_token
+      PUBS_TOPIC_ARN = var.sns_topic_arn
+      RUN_TABLE_NAME = var.run_table_name
     }
   }
 

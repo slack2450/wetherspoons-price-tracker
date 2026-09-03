@@ -1,7 +1,5 @@
 'use strict';
 
-import './runtime-token';
-
 import { randomUUID } from 'node:crypto';
 import { DynamoDBClient, UpdateItemCommand } from '@aws-sdk/client-dynamodb';
 import { PublishCommand, SNSClient } from '@aws-sdk/client-sns';

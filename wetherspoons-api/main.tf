@@ -51,11 +51,6 @@ variable "influxdb_bucket" {
   type = string
 }
 
-variable "wetherspoons_api_token" {
-  type      = string
-  sensitive = true
-}
-
 provider "aws" {
   region     = "eu-west-2"
   access_key = var.aws_access_key
@@ -290,12 +285,11 @@ resource "cloudflare_record" "www_spoons_cheap" {
 }
 
 module "proxy" {
-  source                 = "./proxy"
-  aws_access_key         = var.aws_access_key
-  aws_secret_key         = var.aws_secret_key
-  api_id                 = aws_apigatewayv2_api.wetherspoons_api.id
-  wetherspoons_api_token = var.wetherspoons_api_token
-  origin_verify_secret   = random_password.origin_verify.result
+  source               = "./proxy"
+  aws_access_key       = var.aws_access_key
+  aws_secret_key       = var.aws_secret_key
+  api_id               = aws_apigatewayv2_api.wetherspoons_api.id
+  origin_verify_secret = random_password.origin_verify.result
 }
 
 module "price" {

@@ -44,11 +44,6 @@ variable "max_receive_count" {
   description = "Number of SQS receives before an individual venue is sent to the DLQ"
 }
 
-variable "wetherspoons_api_token" {
-  type      = string
-  sensitive = true
-}
-
 resource "aws_iam_role" "wetherspoons_menu_fetcher_role" {
   name = "wetherspoons-menu-fetcher-role"
 
@@ -147,7 +142,6 @@ resource "aws_lambda_function" "wetherspoons_menu_fetcher" {
       RUN_TABLE_NAME           = var.run_table_name
       MAX_RECEIVE_COUNT        = tostring(var.max_receive_count)
       MENU_SNAPSHOT_BUCKET     = var.menu_snapshot_bucket
-      WETHERSPOONS_API_TOKEN   = var.wetherspoons_api_token
     }
   }
 

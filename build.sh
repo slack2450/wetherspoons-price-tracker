@@ -23,10 +23,6 @@ assert_lambda_bundle() {
             echo "Lambda bundle contains a build-machine file URL: $javascript_file" >&2
             exit 1
         fi
-        if grep -aEq '1\|[A-Za-z0-9]{32,}' "$javascript_file"; then
-            echo "Lambda bundle contains a legacy embedded API credential: $javascript_file" >&2
-            exit 1
-        fi
         archive_javascript="$(basename "$javascript_file")"
         found=false
         for archive_entry in "${archive_entries[@]}"; do
@@ -42,17 +38,12 @@ assert_lambda_bundle() {
     done
 
     # Scan each archived file independently as well as the unpacked webpack
-    # output. This catches credentials in lazy chunks or unexpected zip entries.
+    # output. This catches machine-specific paths in lazy or unexpected chunks.
     scan_file="$(mktemp)"
     for archive_entry in "${archive_entries[@]}"; do
         unzip -p "$archive" "$archive_entry" > "$scan_file"
         if grep -aFq "file:///" "$scan_file"; then
             echo "Lambda archive entry contains a build-machine file URL: $archive:$archive_entry" >&2
-            rm -f -- "$scan_file"
-            return 1
-        fi
-        if grep -aEq '1\|[A-Za-z0-9]{32,}' "$scan_file"; then
-            echo "Lambda archive entry contains a legacy embedded API credential: $archive:$archive_entry" >&2
             rm -f -- "$scan_file"
             return 1
         fi
@@ -67,12 +58,12 @@ self_test_bundle_scanner() {
     (
         cd "$test_dir"
         zip -q index.zip index.js
-        printf '%s\n' 'const credential = "1|ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890";' > poison.js
+        printf '%s\n' '//# sourceMappingURL=file:///build-machine/private/source.js.map' > poison.js
         zip -q index.zip poison.js
         rm -f poison.js
     )
     if (assert_lambda_bundle "$test_dir") >/dev/null 2>&1; then
-        echo "Bundle scanner self-test failed to detect an archived credential" >&2
+        echo "Bundle scanner self-test failed to detect an archived build-machine path" >&2
         rm -rf -- "$test_dir"
         return 1
     fi

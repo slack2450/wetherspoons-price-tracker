@@ -1,7 +1,5 @@
 'use strict';
 
-import './runtime-token';
-
 import { randomUUID } from 'node:crypto';
 import { InfluxDB, Point, WriteApi } from '@influxdata/influxdb-client';
 import { SQSBatchItemFailure, SQSBatchResponse, SQSEvent, SQSRecord } from 'aws-lambda';

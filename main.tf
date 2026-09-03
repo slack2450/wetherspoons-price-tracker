@@ -50,11 +50,6 @@ variable "influxdb_read_api_token" {
   sensitive = true
 }
 
-variable "wetherspoons_api_token" {
-  type      = string
-  sensitive = true
-}
-
 variable "influxdb_org" {
   type = string
 }
@@ -216,13 +211,12 @@ resource "aws_sns_topic_subscription" "wetherspoons_pubs_sqs_target" {
 }
 
 module "wetherspoons_pub_fetcher" {
-  source                 = "./wetherspoons-pub-fetcher"
-  sns_topic_arn          = aws_sns_topic.wetherspoons_pubs.arn
-  alarm_sns_topic_arn    = aws_sns_topic.wetherspoons_alarms.arn
-  run_table_arn          = aws_dynamodb_table.wetherspoons_runs.arn
-  run_table_name         = aws_dynamodb_table.wetherspoons_runs.name
-  wetherspoons_api_token = var.wetherspoons_api_token
-  schedule_state         = var.collector_schedule_state
+  source              = "./wetherspoons-pub-fetcher"
+  sns_topic_arn       = aws_sns_topic.wetherspoons_pubs.arn
+  alarm_sns_topic_arn = aws_sns_topic.wetherspoons_alarms.arn
+  run_table_arn       = aws_dynamodb_table.wetherspoons_runs.arn
+  run_table_name      = aws_dynamodb_table.wetherspoons_runs.name
+  schedule_state      = var.collector_schedule_state
 }
 
 module "wetherspoons_pub_ranker" {
@@ -242,7 +236,6 @@ module "wetherspoons_menu_fetcher" {
   menu_snapshot_bucket_arn = aws_s3_bucket.wetherspoons_menu_snapshots.arn
   menu_snapshot_bucket     = aws_s3_bucket.wetherspoons_menu_snapshots.id
   max_receive_count        = local.menu_max_receive_count
-  wetherspoons_api_token   = var.wetherspoons_api_token
 }
 
 module "wetherspoons_run_monitor" {
@@ -281,5 +274,4 @@ module "wetherspoons_price_api" {
   influxdb_read_api_token = var.influxdb_read_api_token
   influxdb_org            = var.influxdb_org
   influxdb_bucket         = var.influxdb_bucket
-  wetherspoons_api_token  = var.wetherspoons_api_token
 }

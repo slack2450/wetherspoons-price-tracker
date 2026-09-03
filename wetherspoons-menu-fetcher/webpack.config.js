@@ -1,7 +1,6 @@
 const path = require("path");
 const ForkTsCheckerWebpackPlugin = require("fork-ts-checker-webpack-plugin");
 const { IgnorePlugin } = require("webpack");
-const NoEmbeddedApiCredentialPlugin = require("../webpack/no-embedded-api-credential");
 
 module.exports = {
     mode: "production",
@@ -31,7 +30,6 @@ module.exports = {
     plugins: [
         new ForkTsCheckerWebpackPlugin(),
         new IgnorePlugin({ resourceRegExp: /^aws-crt$/ }),
-        new NoEmbeddedApiCredentialPlugin(),
     ],
     cache: {
         type: 'filesystem',

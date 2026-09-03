@@ -10,11 +10,6 @@ variable "api_id" {
   type = string
 }
 
-variable "wetherspoons_api_token" {
-  type      = string
-  sensitive = true
-}
-
 variable "origin_verify_secret" {
   type      = string
   sensitive = true
@@ -77,8 +72,7 @@ resource "aws_lambda_function" "wetherspoons_proxy_api" {
 
   environment {
     variables = {
-      WETHERSPOONS_API_TOKEN = var.wetherspoons_api_token
-      API_ORIGIN_SECRET      = var.origin_verify_secret
+      API_ORIGIN_SECRET = var.origin_verify_secret
     }
   }
 

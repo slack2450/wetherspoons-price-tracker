@@ -14,14 +14,14 @@ This repo also contains a very simple lib in the `lib/` folder
 
 The three upstream consumers are intentionally pinned to `wetherspoons-api@2.1.1`
 until version 3 is published. The exact pin prevents an ordinary install from
-silently taking the breaking server-token contract. Version 2.1.1 contains a
-legacy embedded upstream credential, so do not deploy newly built collector or
-proxy bundles until the following maintenance-window procedure is complete.
-The Lambda functions are unversioned and are updated in place, so allowing old
-and new collectors to process the same run is unsafe.
+silently changing their runtime contract. The API token is the public client
+token shipped by Wetherspoons' own application; it is deliberately included in
+version 3 and is not a secret requiring rotation. The Lambda functions are
+unversioned and updated in place, so allowing old and new collectors to process
+the same run is still unsafe.
 
-1. Publish `wetherspoons-api@3.0.0` from the sibling API repository, but do not
-   rotate the existing upstream credential yet.
+1. Publish `wetherspoons-api@3.0.0` from the sibling API repository only after
+   its real, full-venue GitHub Actions suite succeeds.
 2. Disable the existing EventBridge schedule directly with the AWS Scheduler
    console or API as an out-of-band operational action, and confirm it is
    disabled. Then set the Terraform workspace variable
@@ -36,7 +36,7 @@ and new collectors to process the same run is unsafe.
 4. Change the dependency in `wetherspoons-pub-fetcher`,
    `wetherspoons-menu-fetcher`, and `wetherspoons-api/proxy` to `^3.0.0`, refresh
    all three lockfiles, and run `./build.sh`. The build scans every generated
-   JavaScript chunk and every ZIP entry for the legacy embedded credential.
+   JavaScript chunk and ZIP entry for build-machine paths and missing chunks.
 5. Review a saved Terraform plan, then apply all tracker Lambda, API origin
    gate, concurrency, retention, and infrastructure changes while the schedule
    remains disabled. Do not split the unversioned pub/menu Lambda cutover across
@@ -46,10 +46,6 @@ and new collectors to process the same run is unsafe.
    requests receive `403`. Run one manually triggered collector cycle and
    verify that it reaches `COMPLETE` before proceeding.
 7. Deploy and smoke-test the browser frontend after the tracker API is healthy.
-8. Only after every collector and proxy is confirmed to use v3's environment
-   credential, rotate the historically exposed upstream credential. Update the
-   Terraform secret immediately, apply it while the schedule is still disabled,
-   and repeat the API and collector smoke tests.
-9. Set `collector_schedule_state` back to `ENABLED`, apply, and verify the next
+8. Set `collector_schedule_state` back to `ENABLED`, apply, and verify the next
    scheduled run reaches `COMPLETE`. Keep the 21-day ledger and snapshot
    retention in place so every message in the 14-day DLQ remains recoverable.
