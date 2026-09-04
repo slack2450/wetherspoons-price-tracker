@@ -1,17 +1,7 @@
-name: 'Terraform'
+name: Deploy production
 
 on:
   workflow_dispatch:
-    inputs:
-      phase:
-        description: Deployment phase
-        required: true
-        default: quiesce
-        type: choice
-        options:
-        - quiesce
-        - deploy
-        - resume
 
 permissions:
   contents: read
@@ -21,116 +11,122 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  terraform:
-    name: 'Terraform'
+  deploy:
     runs-on: ubuntu-latest
     environment: production
-    
-    # Use the Bash shell regardless whether the GitHub Actions runner is ubuntu-latest, macos-latest, or windows-latest
     defaults:
       run:
         shell: bash
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_KEY }}
+      TF_VAR_aws_access_key: ${{ secrets.aws_access_key }}
+      TF_VAR_aws_secret_key: ${{ secrets.aws_secret_key }}
+      TF_VAR_cloudflare_api_email: ${{ secrets.cloudflare_api_email }}
+      TF_VAR_cloudflare_api_key: ${{ secrets.cloudflare_api_key }}
+      TF_VAR_influxdb_write_api_token: ${{ secrets.influxdb_write_api_token }}
+      TF_VAR_influxdb_read_api_token: ${{ secrets.influxdb_read_api_token }}
+      TF_VAR_influxdb_url: ${{ vars.influxdb_url }}
+      TF_VAR_influxdb_org: ${{ vars.influxdb_org }}
+      TF_VAR_influxdb_bucket: ${{ vars.influxdb_bucket }}
+      TF_VAR_alarm_email: ${{ secrets.alarm_email }}
+      TF_VAR_collector_schedule_state: 'DISABLED'
+      TF_VAR_pub_fetcher_reserved_concurrency: '0'
 
     steps:
-    # Checkout the repository to the GitHub Actions runner
     - name: Checkout
       uses: actions/checkout@v6
-    
+
     - name: Setup Node.js v24
       uses: actions/setup-node@v6
       with:
         node-version: 24
-    
-    - name: Install dependencies and build
+
+    - name: Build and test every Lambda
       run: ./build.sh
 
-    # Install the latest version of Terraform CLI and configure the Terraform CLI configuration file with a Terraform Cloud user API token
     - name: Setup Terraform
       uses: hashicorp/setup-terraform@v4
       with:
         cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
 
-    # Initialize a new or existing Terraform working directory by creating initial files, loading any remote state, downloading modules, etc.
-    - name: Terraform Init
-      run: terraform init
-
-    # Checks that all Terraform configuration files adhere to a canonical format
-    - name: Terraform Format
-      run: terraform fmt -check -recursive
-
-    - name: Verify collectors are quiescent before deployment
-      if: inputs.phase == 'deploy'
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_KEY }}
-      run: scripts/verify-quiescence.sh
-
-    # Save exactly the plan that the next step applies. Quiesce changes only
-    # the scheduler; deploy keeps it disabled; resume re-enables it last.
-    - name: Terraform Plan
-      env:
-        DEPLOY_PHASE: ${{ inputs.phase }}
-        TF_VAR_aws_access_key: ${{ secrets.aws_access_key }}
-        TF_VAR_aws_secret_key: ${{ secrets.aws_secret_key }}
-        TF_VAR_cloudflare_api_email: ${{ secrets.cloudflare_api_email }}
-        TF_VAR_cloudflare_api_key: ${{ secrets.cloudflare_api_key }}
-        TF_VAR_influxdb_write_api_token: ${{ secrets.influxdb_write_api_token }}
-        TF_VAR_influxdb_read_api_token: ${{ secrets.influxdb_read_api_token }}
-        TF_VAR_influxdb_url: ${{ vars.influxdb_url }}
-        TF_VAR_influxdb_org: ${{ vars.influxdb_org }}
-        TF_VAR_influxdb_bucket: ${{ vars.influxdb_bucket }}
-        TF_VAR_alarm_email: ${{ secrets.alarm_email }}
+    - name: Initialize and validate Terraform
       run: |
-        case "$DEPLOY_PHASE" in
-          quiesce)
-            terraform plan -input=false -out=tfplan \
-              -var collector_schedule_state=DISABLED \
-              -target=module.wetherspoons_pub_fetcher.aws_scheduler_schedule.operational_hours
-            ;;
-          deploy)
-            terraform plan -input=false -out=tfplan -var collector_schedule_state=DISABLED
-            ;;
-          resume)
-            terraform plan -input=false -out=tfplan \
-              -var collector_schedule_state=ENABLED \
-              -target=module.wetherspoons_pub_fetcher.aws_scheduler_schedule.operational_hours
-            ;;
-          *)
-            echo "Unsupported deployment phase: $DEPLOY_PHASE" >&2
-            exit 1
-            ;;
-        esac
+        terraform init
+        terraform fmt -check -recursive
+        terraform validate
 
-      # On push to "master", build or change infrastructure according to Terraform configuration files
-      # Note: It is recommended to set up a required "strict" status check in your repository for "Terraform Cloud". See the documentation on "strict" required status checks for more information: https://help.github.com/en/github/administering-a-repository/types-of-required-status-checks
-    - name: Apply saved Terraform plan
-      env:
-        TF_VAR_aws_access_key: ${{ secrets.aws_access_key }}
-        TF_VAR_aws_secret_key: ${{ secrets.aws_secret_key }}
-        TF_VAR_cloudflare_api_email: ${{ secrets.cloudflare_api_email }}
-        TF_VAR_cloudflare_api_key: ${{ secrets.cloudflare_api_key }}
-        TF_VAR_influxdb_write_api_token: ${{ secrets.influxdb_write_api_token }}
-        TF_VAR_influxdb_read_api_token: ${{ secrets.influxdb_read_api_token }}
-        TF_VAR_influxdb_url: ${{ vars.influxdb_url }}
-        TF_VAR_influxdb_org: ${{ vars.influxdb_org }}
-        TF_VAR_influxdb_bucket: ${{ vars.influxdb_bucket }}
-        TF_VAR_alarm_email: ${{ secrets.alarm_email }}
-      run: terraform apply -auto-approve -input=false tfplan
+    - name: Pause new publisher invocations
+      id: pause_publisher
+      run: |
+        aws lambda put-function-concurrency \
+          --region eu-west-2 \
+          --function-name wetherspoons-pub-fetcher \
+          --reserved-concurrent-executions 0
 
-    - name: Wait for collectors to drain
-      if: inputs.phase == 'quiesce'
+    - name: Disable collector schedule
+      run: |
+        terraform plan -input=false -out=quiesce.tfplan \
+          -target=module.wetherspoons_pub_fetcher.aws_scheduler_schedule.operational_hours
+        terraform apply -auto-approve -input=false quiesce.tfplan
+
+    - name: Wait for the old collectors to become quiescent
       env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_KEY }}
+        QUIESCENCE_PUBLISHER_WAIT_SECONDS: 125
       run: scripts/verify-quiescence.sh
 
-    - name: Smoke-test real Influx-only collector
-      if: inputs.phase == 'deploy'
+    - name: Plan complete deployment while publisher is paused
+      run: terraform plan -input=false -out=deploy.tfplan
+
+    - name: Apply exact deployment plan
+      run: terraform apply -auto-approve -input=false deploy.tfplan
+
+    - name: Release publisher on the new code
+      run: |
+        aws lambda delete-function-concurrency \
+          --region eu-west-2 \
+          --function-name wetherspoons-pub-fetcher
+
+    - name: Drain any deferred publisher invocation
       env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_KEY }}
+        QUIESCENCE_PUBLISHER_WAIT_SECONDS: 0
+      run: scripts/verify-quiescence.sh
+
+    - name: Smoke-test real Influx collector
       run: scripts/smoke-collector.sh
 
     - name: Smoke-test real deployed API
-      if: inputs.phase == 'deploy'
       run: DIRECT_API_BASE="$(terraform output -raw execute_api_endpoint)" node scripts/smoke-deployed-api.mjs
+
+    - name: Re-enable collector schedule only after successful smokes
+      env:
+        TF_VAR_collector_schedule_state: 'ENABLED'
+        TF_VAR_pub_fetcher_reserved_concurrency: '-1'
+      run: |
+        terraform plan -input=false -out=resume.tfplan \
+          -target=module.wetherspoons_pub_fetcher.aws_scheduler_schedule.operational_hours
+        terraform apply -auto-approve -input=false resume.tfplan
+        test "$(aws scheduler get-schedule \
+          --region eu-west-2 \
+          --name wetherspoons-operational-hours \
+          --query State \
+          --output text)" = "ENABLED"
+
+    - name: Leave a failed deployment safely paused
+      if: ${{ failure() && steps.pause_publisher.outcome == 'success' }}
+      run: |
+        schedule_state="$(aws scheduler get-schedule \
+          --region eu-west-2 \
+          --name wetherspoons-operational-hours \
+          --query State \
+          --output text 2>/dev/null || true)"
+        if [[ "$schedule_state" == "ENABLED" ]]; then
+          aws lambda delete-function-concurrency \
+            --region eu-west-2 \
+            --function-name wetherspoons-pub-fetcher
+        else
+          aws lambda put-function-concurrency \
+            --region eu-west-2 \
+            --function-name wetherspoons-pub-fetcher \
+            --reserved-concurrent-executions 0
+        fi

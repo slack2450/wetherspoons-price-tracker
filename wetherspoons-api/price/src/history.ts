@@ -14,7 +14,7 @@ export function buildPriceQuery(bucket: string, venueId: string, productId: stri
   |> filter(fn: (r) => r["venueId"] == ${JSON.stringify(venueId)})
   |> filter(fn: (r) => r["_field"] == "price")
   |> group(columns: [])
-  |> aggregateWindow(every: 60m, fn: mean, createEmpty: false)
+  |> aggregateWindow(every: 60m, fn: last, createEmpty: false)
   |> keep(columns: ["_time", "_value"])
   |> sort(columns: ["_time"])`;
 }

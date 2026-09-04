@@ -69,6 +69,23 @@ variable "collector_schedule_state" {
   }
 }
 
+variable "enable_rankings" {
+  type        = bool
+  description = "Deploy the unfinished rankings feature only when it is ready for production"
+  default     = false
+}
+
+variable "pub_fetcher_reserved_concurrency" {
+  type        = number
+  description = "Use zero to pause new pub-fetcher invocations during a coordinated deployment"
+  default     = -1
+
+  validation {
+    condition     = contains([-1, 0], var.pub_fetcher_reserved_concurrency)
+    error_message = "pub_fetcher_reserved_concurrency must be -1 or 0."
+  }
+}
+
 provider "aws" {
   region     = "eu-west-2"
   access_key = var.aws_access_key
@@ -155,13 +172,15 @@ resource "aws_sns_topic_subscription" "wetherspoons_pubs_sqs_target" {
 }
 
 module "wetherspoons_pub_fetcher" {
-  source              = "./wetherspoons-pub-fetcher"
-  sns_topic_arn       = aws_sns_topic.wetherspoons_pubs.arn
-  alarm_sns_topic_arn = aws_sns_topic.wetherspoons_alarms.arn
-  schedule_state      = var.collector_schedule_state
+  source                         = "./wetherspoons-pub-fetcher"
+  sns_topic_arn                  = aws_sns_topic.wetherspoons_pubs.arn
+  alarm_sns_topic_arn            = aws_sns_topic.wetherspoons_alarms.arn
+  schedule_state                 = var.collector_schedule_state
+  reserved_concurrent_executions = var.pub_fetcher_reserved_concurrency
 }
 
 module "wetherspoons_pub_ranker" {
+  count  = var.enable_rankings ? 1 : 0
   source = "./wetherspoons-pub-ranker"
 }
 
@@ -193,6 +212,24 @@ resource "aws_cloudwatch_metric_alarm" "dead_letter_queue_not_empty" {
   }
 }
 
+resource "aws_cloudwatch_metric_alarm" "source_queue_too_old" {
+  alarm_name          = "wetherspoons-source-queue-too-old"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 1
+  threshold           = 1800
+  period              = 300
+  statistic           = "Maximum"
+  namespace           = "AWS/SQS"
+  metric_name         = "ApproximateAgeOfOldestMessage"
+  alarm_description   = "Collector messages have remained unprocessed for more than 30 minutes"
+  alarm_actions       = [aws_sns_topic.wetherspoons_alarms.arn]
+  treat_missing_data  = "notBreaching"
+
+  dimensions = {
+    QueueName = aws_sqs_queue.wetherspoons_queue.name
+  }
+}
+
 module "wetherspoons_price_api" {
   source                  = "./wetherspoons-api"
   aws_access_key          = var.aws_access_key
@@ -203,4 +240,5 @@ module "wetherspoons_price_api" {
   influxdb_read_api_token = var.influxdb_read_api_token
   influxdb_org            = var.influxdb_org
   influxdb_bucket         = var.influxdb_bucket
+  enable_rankings         = var.enable_rankings
 }

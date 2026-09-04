@@ -7,6 +7,12 @@ readonly RUN_ID="collector-smoke-${GITHUB_RUN_ID:-local}-${GITHUB_RUN_ATTEMPT:-1
 readonly OBSERVED_AT="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
 readonly START_TIME_MS="$(( $(date +%s) * 1000 - 60000 ))"
 readonly MENU_LOG_GROUP="/aws/lambda/wetherspoons-menu-fetcher"
+readonly MIN_WRITTEN_PERCENT="${COLLECTOR_SMOKE_MIN_WRITTEN_PERCENT:-80}"
+
+if [[ ! "$MIN_WRITTEN_PERCENT" =~ ^[0-9]+$ ]] || ((MIN_WRITTEN_PERCENT < 1 || MIN_WRITTEN_PERCENT > 100)); then
+  echo "COLLECTOR_SMOKE_MIN_WRITTEN_PERCENT must be an integer from 1 to 100" >&2
+  exit 1
+fi
 
 payload="$(jq -nc --arg id "$RUN_ID" --arg time "$OBSERVED_AT" '{id:$id,time:$time}')"
 invoke_result="$(aws lambda invoke \
@@ -30,22 +36,31 @@ if [[ "$returned_run_id" != "$RUN_ID" || ! "$published_count" =~ ^[0-9]+$ || "$p
 fi
 
 for ((attempt = 1; attempt <= 120; attempt += 1)); do
-  terminal_count="$(aws logs filter-log-events \
+  messages="$(aws logs filter-log-events \
     --region "$AWS_REGION" \
     --log-group-name "$MENU_LOG_GROUP" \
     --start-time "$START_TIME_MS" \
     --filter-pattern "\"$RUN_ID\"" \
     --query 'events[].message' \
-    --output text \
-    | tr '\t' '\n' \
+    --output text)"
+  terminal_count="$(tr '\t' '\n' <<<"$messages" \
     | sed -nE 's/.*\(([0-9]+)\) (points|reason)=.*/\1/p' \
     | sort -u \
     | wc -l)"
-  echo "Collector smoke attempt=$attempt runId=$RUN_ID terminal=$terminal_count/$published_count"
+  written_count="$(tr '\t' '\n' <<<"$messages" \
+    | sed -nE 's/.*MENU_WRITTEN.*\(([0-9]+)\) points=.*/\1/p' \
+    | sort -u \
+    | wc -l)"
+  echo "Collector smoke attempt=$attempt runId=$RUN_ID terminal=$terminal_count/$published_count written=$written_count"
 
   if ((terminal_count >= published_count)); then
-    scripts/verify-quiescence.sh
-    echo "COLLECTOR_SMOKE_OK runId=$RUN_ID terminal=$terminal_count published=$published_count"
+    minimum_written="$(((published_count * MIN_WRITTEN_PERCENT + 99) / 100))"
+    if ((written_count < minimum_written)); then
+      echo "Collector wrote only $written_count/$published_count venues; expected at least $minimum_written ($MIN_WRITTEN_PERCENT%)" >&2
+      exit 1
+    fi
+    QUIESCENCE_PUBLISHER_WAIT_SECONDS=0 scripts/verify-quiescence.sh
+    echo "COLLECTOR_SMOKE_OK runId=$RUN_ID terminal=$terminal_count written=$written_count published=$published_count"
     exit 0
   fi
 

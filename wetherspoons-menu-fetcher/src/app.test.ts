@@ -138,7 +138,7 @@ describe('menu fetcher', () => {
     expect(dependencies.getDrinks).toHaveBeenCalledTimes(2);
   });
 
-  it('uses the current queue message venue name when retry metadata changes', async () => {
+  it('keeps stable series identity when retry metadata changes', async () => {
     const dependencies = unavailableDependencies();
     const lines: string[] = [];
     dependencies.getDrinks = vi.fn(async () => ({
@@ -165,7 +165,9 @@ describe('menu fetcher', () => {
     await expect(processRecord(renamed, dependencies)).resolves.toBeUndefined();
     expect(dependencies.getDrinks).toHaveBeenCalledTimes(2);
     expect(lines).toHaveLength(2);
-    expect(lines[1]).toContain('venueName=Renamed\\ Pub');
+    expect(lines[0]?.split(' ')[0]).toBe(lines[1]?.split(' ')[0]);
+    expect(lines[1]).toContain('venueName="Renamed Pub"');
+    expect(lines[1]).toContain('currency="GBP"');
   });
 
 });

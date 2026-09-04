@@ -51,6 +51,12 @@ variable "influxdb_bucket" {
   type = string
 }
 
+variable "enable_rankings" {
+  type        = bool
+  description = "Deploy the rankings API only when it has a real implementation"
+  default     = false
+}
+
 provider "aws" {
   region     = "eu-west-2"
   access_key = var.aws_access_key
@@ -98,8 +104,8 @@ resource "aws_apigatewayv2_stage" "wetherspoons_api_stage" {
   name        = "$default"
   auto_deploy = true
   default_route_settings {
-    throttling_burst_limit = 100
-    throttling_rate_limit  = 50
+    throttling_burst_limit = 10
+    throttling_rate_limit  = 5
   }
 }
 
@@ -127,6 +133,31 @@ resource "aws_cloudfront_cache_policy" "wetherspoons_api_cache" {
       query_strings {
         items = ["range"]
       }
+    }
+  }
+}
+
+resource "aws_cloudfront_cache_policy" "wetherspoons_proxy_cache" {
+  comment     = "Cache public venue and menu responses without caller-controlled variants"
+  default_ttl = 300
+  max_ttl     = 3600
+  min_ttl     = 0
+  name        = "SpoonsProxyCaching"
+
+  parameters_in_cache_key_and_forwarded_to_origin {
+    enable_accept_encoding_brotli = true
+    enable_accept_encoding_gzip   = true
+
+    cookies_config {
+      cookie_behavior = "none"
+    }
+
+    headers_config {
+      header_behavior = "none"
+    }
+
+    query_strings_config {
+      query_string_behavior = "none"
     }
   }
 }
@@ -181,7 +212,7 @@ resource "aws_cloudfront_distribution" "wetherspoons_api" {
       "GET",
       "HEAD",
     ]
-    cache_policy_id = aws_cloudfront_cache_policy.wetherspoons_api_cache.id
+    cache_policy_id = aws_cloudfront_cache_policy.wetherspoons_proxy_cache.id
     cached_methods = [
       "GET",
       "HEAD",
@@ -190,6 +221,26 @@ resource "aws_cloudfront_distribution" "wetherspoons_api" {
     default_ttl                = 0
     max_ttl                    = 0
     min_ttl                    = 0
+    response_headers_policy_id = aws_cloudfront_response_headers_policy.wetherspoons_api_cors.id
+    smooth_streaming           = false
+    target_origin_id           = aws_apigatewayv2_api.wetherspoons_api.id
+    trusted_key_groups         = []
+    trusted_signers            = []
+    viewer_protocol_policy     = "redirect-to-https"
+  }
+
+  ordered_cache_behavior {
+    path_pattern = "/v2/price/*"
+    allowed_methods = [
+      "GET",
+      "HEAD",
+    ]
+    cache_policy_id = aws_cloudfront_cache_policy.wetherspoons_api_cache.id
+    cached_methods = [
+      "GET",
+      "HEAD",
+    ]
+    compress                   = true
     response_headers_policy_id = aws_cloudfront_response_headers_policy.wetherspoons_api_cors.id
     smooth_streaming           = false
     target_origin_id           = aws_apigatewayv2_api.wetherspoons_api.id
@@ -282,8 +333,7 @@ module "price" {
 }
 
 module "rankings" {
-  source         = "./rankings"
-  aws_access_key = var.aws_access_key
-  aws_secret_key = var.aws_secret_key
-  api_id         = aws_apigatewayv2_api.wetherspoons_api.id
+  count  = var.enable_rankings ? 1 : 0
+  source = "./rankings"
+  api_id = aws_apigatewayv2_api.wetherspoons_api.id
 }

@@ -172,21 +172,6 @@ resource "aws_cloudwatch_metric_alarm" "menu_record_failures" {
   statistic           = "Sum"
 }
 
-# CloudWatch metric filter for errors
-resource "aws_cloudwatch_log_metric_filter" "menu_fetcher_errors" {
-  name           = "menu-fetcher-errors"
-  log_group_name = aws_cloudwatch_log_group.wetherspoons_menu_fetcher.name
-  pattern        = "[ERROR]"
-
-  metric_transformation {
-    name          = "MenuFetcherErrors"
-    namespace     = "WetherspoonsPriceTracker"
-    value         = "1"
-    default_value = 0
-  }
-}
-
-# CloudWatch alarm for error rate > 10%
 resource "aws_cloudwatch_metric_alarm" "menu_fetcher_error_rate" {
   alarm_name          = "menu-fetcher-error-rate-high"
   comparison_operator = "GreaterThanThreshold"
@@ -199,6 +184,24 @@ resource "aws_cloudwatch_metric_alarm" "menu_fetcher_error_rate" {
   metric_name         = "Errors"
   period              = 300
   statistic           = "Sum"
+  dimensions = {
+    FunctionName = aws_lambda_function.wetherspoons_menu_fetcher.function_name
+  }
+}
+
+resource "aws_cloudwatch_metric_alarm" "menu_fetcher_throttles" {
+  alarm_name          = "menu-fetcher-throttled"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 1
+  threshold           = 0
+  alarm_description   = "The menu-fetcher Lambda was throttled before it could process queued work"
+  alarm_actions       = [var.alarm_sns_topic_arn]
+  treat_missing_data  = "notBreaching"
+  namespace           = "AWS/Lambda"
+  metric_name         = "Throttles"
+  period              = 300
+  statistic           = "Sum"
+
   dimensions = {
     FunctionName = aws_lambda_function.wetherspoons_menu_fetcher.function_name
   }
