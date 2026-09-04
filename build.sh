@@ -94,13 +94,6 @@ npm run build
 assert_lambda_bundle ./dist
 cd ..
 
-# wetherspoons-run-monitor
-cd ./wetherspoons-run-monitor
-npm ci
-npm run build
-assert_lambda_bundle ./dist
-cd ..
-
 # wetherspoons-api
 cd ./wetherspoons-api
 cd ./proxy

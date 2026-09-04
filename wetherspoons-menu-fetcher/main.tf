@@ -23,14 +23,6 @@ variable "alarm_sns_topic_arn" {
   description = "SNS topic ARN for CloudWatch alarms"
 }
 
-variable "run_table_arn" {
-  type = string
-}
-
-variable "run_table_name" {
-  type = string
-}
-
 variable "max_receive_count" {
   type        = number
   description = "Number of SQS receives before an individual venue is sent to the DLQ"
@@ -78,22 +70,6 @@ resource "aws_iam_role_policy" "wetherspoons_menu_fetcher_sqs" {
   )
 }
 
-resource "aws_iam_role_policy" "wetherspoons_menu_fetcher_runs" {
-  name = "run-ledger"
-  role = aws_iam_role.wetherspoons_menu_fetcher_role.id
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Action = [
-        "dynamodb:GetItem",
-        "dynamodb:UpdateItem",
-      ]
-      Effect   = "Allow"
-      Resource = var.run_table_arn
-    }]
-  })
-}
-
 resource "aws_lambda_function" "wetherspoons_menu_fetcher" {
   architectures = [
     "arm64",
@@ -115,7 +91,6 @@ resource "aws_lambda_function" "wetherspoons_menu_fetcher" {
       INFLUXDB_WRITE_API_TOKEN = var.influxdb_write_api_token
       INFLUXDB_ORG             = var.influxdb_org
       INFLUXDB_BUCKET          = var.influxdb_bucket
-      RUN_TABLE_NAME           = var.run_table_name
       MAX_RECEIVE_COUNT        = tostring(var.max_receive_count)
     }
   }

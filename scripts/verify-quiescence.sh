@@ -5,7 +5,6 @@ readonly AWS_REGION="eu-west-2"
 readonly SCHEDULE_NAME="wetherspoons-operational-hours"
 readonly SOURCE_QUEUE_NAME="wetherspoons-queue"
 readonly DLQ_NAME="wetherspoons-dead-letter-queue"
-readonly RUN_TABLE_NAME="wetherspoons-runs"
 readonly MAX_ATTEMPTS="${QUIESCENCE_MAX_ATTEMPTS:-20}"
 readonly POLL_SECONDS="${QUIESCENCE_POLL_SECONDS:-30}"
 readonly REQUIRED_STABLE_POLLS="${QUIESCENCE_STABLE_POLLS:-3}"
@@ -77,18 +76,4 @@ if [[ "$dlq_visible" != "0" || "$dlq_in_flight" != "0" || "$dlq_delayed" != "0" 
   exit 1
 fi
 
-active_runs="$(aws dynamodb scan \
-  --region "$AWS_REGION" \
-  --table-name "$RUN_TABLE_NAME" \
-  --filter-expression '#status = :processing OR #status = :publish_failed' \
-  --expression-attribute-names '{"#status":"status"}' \
-  --expression-attribute-values '{":processing":{"S":"PROCESSING"},":publish_failed":{"S":"PUBLISH_FAILED"}}' \
-  --projection-expression 'runId,#status' \
-  --output json \
-  --query 'length(Items)')"
-if [[ "$active_runs" != "0" ]]; then
-  echo "Run ledger contains $active_runs unresolved PROCESSING/PUBLISH_FAILED run(s)" >&2
-  exit 1
-fi
-
-echo "QUIESCENCE_OK source_queue=empty dlq=empty unresolved_runs=0"
+echo "QUIESCENCE_OK source_queue=empty dlq=empty"

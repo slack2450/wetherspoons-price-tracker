@@ -95,22 +95,6 @@ resource "aws_sns_topic" "wetherspoons_alarms" {
   name = "wetherspoons-alarms"
 }
 
-resource "aws_dynamodb_table" "wetherspoons_runs" {
-  name         = "wetherspoons-runs"
-  billing_mode = "PAY_PER_REQUEST"
-  hash_key     = "runId"
-
-  attribute {
-    name = "runId"
-    type = "S"
-  }
-
-  ttl {
-    attribute_name = "expiresAt"
-    enabled        = true
-  }
-}
-
 variable "alarm_email" {
   type        = string
   description = "Email address to receive CloudWatch alarm notifications"
@@ -174,8 +158,6 @@ module "wetherspoons_pub_fetcher" {
   source              = "./wetherspoons-pub-fetcher"
   sns_topic_arn       = aws_sns_topic.wetherspoons_pubs.arn
   alarm_sns_topic_arn = aws_sns_topic.wetherspoons_alarms.arn
-  run_table_arn       = aws_dynamodb_table.wetherspoons_runs.arn
-  run_table_name      = aws_dynamodb_table.wetherspoons_runs.name
   schedule_state      = var.collector_schedule_state
 }
 
@@ -191,18 +173,7 @@ module "wetherspoons_menu_fetcher" {
   influxdb_org             = var.influxdb_org
   influxdb_bucket          = var.influxdb_bucket
   alarm_sns_topic_arn      = aws_sns_topic.wetherspoons_alarms.arn
-  run_table_arn            = aws_dynamodb_table.wetherspoons_runs.arn
-  run_table_name           = aws_dynamodb_table.wetherspoons_runs.name
   max_receive_count        = local.menu_max_receive_count
-}
-
-module "wetherspoons_run_monitor" {
-  source              = "./wetherspoons-run-monitor"
-  alarm_sns_topic_arn = aws_sns_topic.wetherspoons_alarms.arn
-  dlq_arn             = aws_sqs_queue.wetherspoons_dead_letter_queue.arn
-  dlq_url             = aws_sqs_queue.wetherspoons_dead_letter_queue.id
-  run_table_arn       = aws_dynamodb_table.wetherspoons_runs.arn
-  run_table_name      = aws_dynamodb_table.wetherspoons_runs.name
 }
 
 resource "aws_cloudwatch_metric_alarm" "dead_letter_queue_not_empty" {

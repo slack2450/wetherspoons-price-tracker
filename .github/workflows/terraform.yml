@@ -12,7 +12,6 @@ on:
         - quiesce
         - deploy
         - resume
-        - retire-snapshots
 
 permissions:
   contents: read
@@ -60,29 +59,11 @@ jobs:
       run: terraform fmt -check -recursive
 
     - name: Verify collectors are quiescent before deployment
-      if: inputs.phase == 'deploy' || inputs.phase == 'retire-snapshots'
+      if: inputs.phase == 'deploy'
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_KEY }}
       run: scripts/verify-quiescence.sh
-
-    - name: Empty retired snapshot bucket
-      if: inputs.phase == 'retire-snapshots'
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_KEY }}
-        AWS_DEFAULT_REGION: eu-west-2
-      run: |
-        snapshot_bucket="$(terraform show -json | jq -r '
-          .values.root_module.resources[]
-          | select(.address == "aws_s3_bucket.wetherspoons_menu_snapshots")
-          | .values.bucket
-        ')"
-        if [[ -z "$snapshot_bucket" || "$snapshot_bucket" == "null" ]]; then
-          echo "Could not resolve the snapshot bucket from Terraform state" >&2
-          exit 1
-        fi
-        aws s3 rm "s3://$snapshot_bucket" --recursive
 
     # Save exactly the plan that the next step applies. Quiesce changes only
     # the scheduler; deploy keeps it disabled; resume re-enables it last.
@@ -114,9 +95,6 @@ jobs:
               -var collector_schedule_state=ENABLED \
               -target=module.wetherspoons_pub_fetcher.aws_scheduler_schedule.operational_hours
             ;;
-          retire-snapshots)
-            terraform plan -input=false -out=tfplan -var collector_schedule_state=DISABLED
-            ;;
           *)
             echo "Unsupported deployment phase: $DEPLOY_PHASE" >&2
             exit 1
@@ -147,12 +125,12 @@ jobs:
       run: scripts/verify-quiescence.sh
 
     - name: Smoke-test real Influx-only collector
-      if: inputs.phase == 'retire-snapshots'
+      if: inputs.phase == 'deploy'
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_KEY }}
       run: scripts/smoke-collector.sh
 
     - name: Smoke-test real deployed API
-      if: inputs.phase == 'deploy' || inputs.phase == 'retire-snapshots'
+      if: inputs.phase == 'deploy'
       run: DIRECT_API_BASE="$(terraform output -raw execute_api_endpoint)" node scripts/smoke-deployed-api.mjs

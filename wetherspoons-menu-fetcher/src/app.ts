@@ -1,6 +1,5 @@
 'use strict';
 
-import { randomUUID } from 'node:crypto';
 import { InfluxDB, Point, WriteApi } from '@influxdata/influxdb-client';
 import { SQSBatchItemFailure, SQSBatchResponse, SQSEvent, SQSRecord } from 'aws-lambda';
 import {
@@ -8,11 +7,6 @@ import {
   getDrinks,
   highLevelVenueSchema,
 } from 'wetherspoons-api';
-import { claimVenue, ClaimOutcome, markTerminal } from './run-ledger';
-
-export { isRunComplete } from './run-ledger';
-
-type TerminalOutcome = 'written' | 'unavailable';
 const SERVER_UPSTREAM_DEADLINE_MS = 25_000;
 
 interface RunMessage {
@@ -24,18 +18,6 @@ interface RunMessage {
 export interface Dependencies {
   getDrinks: (venue: RunMessage['venue']) => Promise<DrinksResult>
   createWriteApi: () => Pick<WriteApi, 'writePoint' | 'close'>
-  claimVenue: (
-    runId: string,
-    venueId: string,
-    leaseToken: string,
-    observedAt: string,
-  ) => Promise<ClaimOutcome>
-  markTerminal: (
-    runId: string,
-    venueId: string,
-    leaseToken: string,
-    outcome: TerminalOutcome,
-  ) => Promise<void>
 }
 
 function parseRecord(record: SQSRecord): RunMessage {
@@ -78,8 +60,6 @@ const defaultDependencies: Dependencies = {
         maxRetryDelay: 15000,
       },
     ),
-  claimVenue,
-  markTerminal,
 };
 
 export async function processRecord(
@@ -88,21 +68,12 @@ export async function processRecord(
 ): Promise<void> {
   const { runId, observedAt, venue } = parseRecord(record);
   const venueId = venue.venueRef.toString();
-  const leaseToken = randomUUID();
-  const claim = await dependencies.claimVenue(runId, venueId, leaseToken, observedAt);
-  if (claim === 'terminal') {
-    console.log(`MENU_ALREADY_TERMINAL runId=${runId} venue=${venue.name} (${venueId})`);
-    return;
-  }
-  if (claim === 'busy') throw new Error(`Venue ${venueId} is already being processed`);
-
   const result = await dependencies.getDrinks(venue);
   if ((result as { partial?: boolean }).partial) {
     throw new Error(`Refusing to persist a partial menu for venue ${venueId}`);
   }
 
   if (result.status === 'unavailable') {
-    await dependencies.markTerminal(runId, venueId, leaseToken, 'unavailable');
     console.log(
       `MENU_UNAVAILABLE runId=${runId} venue=${venue.name} (${venueId}) reason=${result.reason}`,
     );
@@ -125,10 +96,9 @@ export async function processRecord(
     writeApi.writePoint(point);
   }
 
-  // A record is terminal only after InfluxDB confirms that its complete venue
-  // payload was flushed. Any error before this point returns the SQS item ID.
+  // SQS deletes a record only after InfluxDB confirms that the complete venue
+  // payload was flushed. Any error before this point returns the item ID.
   await writeApi.close();
-  await dependencies.markTerminal(runId, venueId, leaseToken, 'written');
   console.log(
     `MENU_WRITTEN runId=${runId} venue=${venue.name} (${venueId}) points=${result.drinks.length}`,
   );

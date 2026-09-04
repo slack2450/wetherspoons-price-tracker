@@ -7,14 +7,6 @@ variable "alarm_sns_topic_arn" {
   description = "SNS topic ARN for CloudWatch alarms"
 }
 
-variable "run_table_arn" {
-  type = string
-}
-
-variable "run_table_name" {
-  type = string
-}
-
 variable "schedule_state" {
   type        = string
   description = "EventBridge Scheduler state; set to DISABLED while draining for a deployment"
@@ -62,23 +54,6 @@ resource "aws_iam_role_policy" "wetherspoons_pub_fetcher_sns" {
   )
 }
 
-resource "aws_iam_role_policy" "wetherspoons_pub_fetcher_runs" {
-  name = "run-ledger"
-  role = aws_iam_role.wetherspoons_pub_fetcher_role.id
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Action = [
-        "dynamodb:GetItem",
-        "dynamodb:PutItem",
-        "dynamodb:UpdateItem",
-      ]
-      Effect   = "Allow"
-      Resource = var.run_table_arn
-    }]
-  })
-}
-
 resource "aws_lambda_function" "wetherspoons_pub_fetcher" {
   architectures = [
     "arm64",
@@ -97,7 +72,6 @@ resource "aws_lambda_function" "wetherspoons_pub_fetcher" {
   environment {
     variables = {
       PUBS_TOPIC_ARN = var.sns_topic_arn
-      RUN_TABLE_NAME = var.run_table_name
     }
   }
 

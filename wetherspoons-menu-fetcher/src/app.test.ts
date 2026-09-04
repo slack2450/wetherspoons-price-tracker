@@ -1,7 +1,7 @@
 import { Point } from '@influxdata/influxdb-client';
 import { SQSEvent, SQSRecord } from 'aws-lambda';
 import { describe, expect, it, vi } from 'vitest';
-import { Dependencies, handle, isRunComplete, processRecord } from './app';
+import { Dependencies, handle, processRecord } from './app';
 
 const venue = {
   franchise: 'jdw',
@@ -48,29 +48,15 @@ function unavailableDependencies(): Dependencies {
       writePoint: vi.fn(),
       close: vi.fn(async () => undefined),
     })),
-    claimVenue: vi.fn(async () => 'claimed' as const),
-    markTerminal: vi.fn(async () => undefined),
   };
 }
 
 describe('menu fetcher', () => {
-  it('cannot complete a run before every expected venue is terminal', () => {
-    expect(isRunComplete(793, 794)).toBe(false);
-    expect(isRunComplete(794, 794)).toBe(true);
-    expect(isRunComplete(0, 0)).toBe(false);
-  });
-
   it('records a legitimate unavailable menu without opening an Influx writer', async () => {
     const dependencies = unavailableDependencies();
     await processRecord(record('one'), dependencies);
 
     expect(dependencies.createWriteApi).not.toHaveBeenCalled();
-    expect(dependencies.markTerminal).toHaveBeenCalledWith(
-      'run-1',
-      '1234',
-      expect.any(String),
-      'unavailable',
-    );
   });
 
   it('returns only failed SQS records for retry', async () => {
@@ -88,7 +74,6 @@ describe('menu fetcher', () => {
     await expect(handle(event, dependencies)).resolves.toEqual({
       batchItemFailures: [{ itemIdentifier: 'failure' }],
     });
-    expect(dependencies.markTerminal).toHaveBeenCalledTimes(1);
   });
 
   it('only logs a record failure after SQS retries are exhausted', async () => {
@@ -107,7 +92,7 @@ describe('menu fetcher', () => {
     error.mockRestore();
   });
 
-  it('does not mark a venue terminal when the Influx flush fails', async () => {
+  it('retries a venue when the Influx flush fails', async () => {
     const dependencies = unavailableDependencies();
     dependencies.getDrinks = vi.fn(async () => ({
       status: 'available' as const,
@@ -119,10 +104,9 @@ describe('menu fetcher', () => {
     }));
 
     await expect(processRecord(record('one'), dependencies)).rejects.toThrow('Influx timeout');
-    expect(dependencies.markTerminal).not.toHaveBeenCalled();
   });
 
-  it('does not persist or complete a partial upstream menu', async () => {
+  it('does not persist a partial upstream menu', async () => {
     const dependencies = unavailableDependencies();
     dependencies.getDrinks = vi.fn(async () => ({
       status: 'available' as const,
@@ -132,7 +116,6 @@ describe('menu fetcher', () => {
 
     await expect(processRecord(record('one'), dependencies)).rejects.toThrow('partial menu');
     expect(dependencies.createWriteApi).not.toHaveBeenCalled();
-    expect(dependencies.markTerminal).not.toHaveBeenCalled();
   });
 
   it('uses the run timestamp so retries write the identical Influx point', async () => {
@@ -152,7 +135,6 @@ describe('menu fetcher', () => {
 
     expect(lines).toHaveLength(2);
     expect(lines[0]).toBe(lines[1]);
-    expect(dependencies.markTerminal).toHaveBeenCalledTimes(2);
     expect(dependencies.getDrinks).toHaveBeenCalledTimes(2);
   });
 
@@ -184,26 +166,6 @@ describe('menu fetcher', () => {
     expect(dependencies.getDrinks).toHaveBeenCalledTimes(2);
     expect(lines).toHaveLength(2);
     expect(lines[1]).toContain('venueName=Renamed\\ Pub');
-    expect(dependencies.markTerminal).toHaveBeenCalledTimes(2);
   });
 
-  it('short-circuits a completed duplicate before fetching or writing', async () => {
-    const dependencies = unavailableDependencies();
-    dependencies.claimVenue = vi.fn(async () => 'terminal' as const);
-
-    await processRecord(record('duplicate'), dependencies);
-
-    expect(dependencies.getDrinks).not.toHaveBeenCalled();
-    expect(dependencies.createWriteApi).not.toHaveBeenCalled();
-    expect(dependencies.markTerminal).not.toHaveBeenCalled();
-  });
-
-  it('retries an active leased venue without touching the upstream', async () => {
-    const dependencies = unavailableDependencies();
-    dependencies.claimVenue = vi.fn(async () => 'busy' as const);
-
-    await expect(processRecord(record('duplicate'), dependencies))
-      .rejects.toThrow('already being processed');
-    expect(dependencies.getDrinks).not.toHaveBeenCalled();
-  });
 });
