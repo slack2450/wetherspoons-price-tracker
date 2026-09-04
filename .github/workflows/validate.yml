@@ -1,0 +1,26 @@
+name: Validate
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches-ignore: [master]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v6
+    - uses: actions/setup-node@v6
+      with:
+        node-version: 24
+    - name: Build and test every Lambda
+      run: ./build.sh
+    - uses: hashicorp/setup-terraform@v4
+    - name: Initialize providers without remote state
+      run: terraform init -backend=false
+    - run: terraform fmt -check -recursive
+    - run: terraform validate

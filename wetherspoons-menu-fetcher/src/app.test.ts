@@ -38,6 +38,7 @@ function record(messageId: string, venueRef = venue.venueRef): SQSRecord {
 }
 
 function unavailableDependencies(): Dependencies {
+  let snapshot: Awaited<ReturnType<Dependencies['loadSnapshot']>>;
   return {
     getDrinks: vi.fn(async () => ({
       status: 'unavailable' as const,
@@ -48,6 +49,9 @@ function unavailableDependencies(): Dependencies {
       writePoint: vi.fn(),
       close: vi.fn(async () => undefined),
     })),
+    claimVenue: vi.fn(async () => 'claimed' as const),
+    loadSnapshot: vi.fn(async () => snapshot),
+    saveSnapshot: vi.fn(async (_runId, _venueId, saved) => { snapshot = saved; }),
     markTerminal: vi.fn(async () => undefined),
   };
 }
@@ -64,7 +68,12 @@ describe('menu fetcher', () => {
     await processRecord(record('one'), dependencies);
 
     expect(dependencies.createWriteApi).not.toHaveBeenCalled();
-    expect(dependencies.markTerminal).toHaveBeenCalledWith('run-1', '1234', 'unavailable');
+    expect(dependencies.markTerminal).toHaveBeenCalledWith(
+      'run-1',
+      '1234',
+      expect.any(String),
+      'unavailable',
+    );
   });
 
   it('returns only failed SQS records for retry', async () => {
@@ -105,7 +114,7 @@ describe('menu fetcher', () => {
     const dependencies = unavailableDependencies();
     dependencies.getDrinks = vi.fn(async () => ({
       status: 'available' as const,
-      drinks: [{ name: 'Beer', units: 2, productId: 99, price: 3, ppu: 1.5 }],
+      drinks: [{ name: 'Beer', units: 2, productId: 99, price: 3, ppu: 1.5, currency: 'GBP' }],
     }));
     dependencies.createWriteApi = vi.fn(() => ({
       writePoint: vi.fn(),
@@ -116,12 +125,25 @@ describe('menu fetcher', () => {
     expect(dependencies.markTerminal).not.toHaveBeenCalled();
   });
 
+  it('does not persist or complete a partial upstream menu', async () => {
+    const dependencies = unavailableDependencies();
+    dependencies.getDrinks = vi.fn(async () => ({
+      status: 'available' as const,
+      partial: true,
+      drinks: [{ name: 'Beer', units: 2, productId: 99, price: 3, ppu: 1.5, currency: 'GBP' }],
+    }));
+
+    await expect(processRecord(record('one'), dependencies)).rejects.toThrow('partial menu');
+    expect(dependencies.createWriteApi).not.toHaveBeenCalled();
+    expect(dependencies.markTerminal).not.toHaveBeenCalled();
+  });
+
   it('uses the run timestamp so retries write the identical Influx point', async () => {
     const lines: string[] = [];
     const dependencies = unavailableDependencies();
     dependencies.getDrinks = vi.fn(async () => ({
       status: 'available' as const,
-      drinks: [{ name: 'Beer', units: 2, productId: 99, price: 3, ppu: 1.5 }],
+      drinks: [{ name: 'Beer', units: 2, productId: 99, price: 3, ppu: 1.5, currency: 'GBP' }],
     }));
     dependencies.createWriteApi = vi.fn(() => ({
       writePoint: (point: Point) => { lines.push(point.toLineProtocol()!); },
@@ -134,5 +156,79 @@ describe('menu fetcher', () => {
     expect(lines).toHaveLength(2);
     expect(lines[0]).toBe(lines[1]);
     expect(dependencies.markTerminal).toHaveBeenCalledTimes(2);
+    expect(dependencies.getDrinks).toHaveBeenCalledOnce();
+  });
+
+  it('uses the immutable snapshot venue name when a retry message has changed', async () => {
+    const dependencies = unavailableDependencies();
+    const lines: string[] = [];
+    dependencies.getDrinks = vi.fn(async () => ({
+      status: 'available' as const,
+      drinks: [{ name: 'Beer', units: 2, productId: 99, price: 3, ppu: 1.5, currency: 'GBP' }],
+    }));
+    dependencies.createWriteApi = vi.fn(() => ({
+      writePoint: (point: Point) => { lines.push(point.toLineProtocol()!); },
+      close: vi.fn(async () => undefined),
+    }));
+    await processRecord(record('first'), dependencies);
+
+    const renamed = record('retry');
+    const envelope = JSON.parse(renamed.body) as { Message: string };
+    const message = JSON.parse(envelope.Message) as {
+      runId: string
+      observedAt: string
+      venue: typeof venue
+    };
+    message.venue.name = 'Renamed Pub';
+    envelope.Message = JSON.stringify(message);
+    renamed.body = JSON.stringify(envelope);
+
+    await expect(processRecord(renamed, dependencies)).resolves.toBeUndefined();
+    expect(dependencies.getDrinks).toHaveBeenCalledOnce();
+    expect(lines).toHaveLength(2);
+    expect(lines[1]).toBe(lines[0]);
+    expect(lines[1]).toContain('venueName=Test\\ Pub');
+    expect(lines[1]).not.toContain('Renamed');
+    expect(dependencies.markTerminal).toHaveBeenCalledTimes(2);
+  });
+
+  it('rejects retry messages with a non-canonical snapshot timestamp', async () => {
+    const dependencies = unavailableDependencies();
+    await processRecord(record('first'), dependencies);
+
+    const changedTime = record('retry');
+    const envelope = JSON.parse(changedTime.body) as { Message: string };
+    const message = JSON.parse(envelope.Message) as {
+      runId: string
+      observedAt: string
+      venue: typeof venue
+    };
+    message.observedAt = '2026-08-12T22:00:00.000Z';
+    envelope.Message = JSON.stringify(message);
+    changedTime.body = JSON.stringify(envelope);
+
+    await expect(processRecord(changedTime, dependencies)).rejects.toThrow('conflicting observedAt');
+    expect(dependencies.createWriteApi).not.toHaveBeenCalled();
+  });
+
+  it('short-circuits a completed duplicate before fetching or writing', async () => {
+    const dependencies = unavailableDependencies();
+    dependencies.claimVenue = vi.fn(async () => 'terminal' as const);
+
+    await processRecord(record('duplicate'), dependencies);
+
+    expect(dependencies.getDrinks).not.toHaveBeenCalled();
+    expect(dependencies.loadSnapshot).not.toHaveBeenCalled();
+    expect(dependencies.createWriteApi).not.toHaveBeenCalled();
+    expect(dependencies.markTerminal).not.toHaveBeenCalled();
+  });
+
+  it('retries an active leased venue without touching the upstream', async () => {
+    const dependencies = unavailableDependencies();
+    dependencies.claimVenue = vi.fn(async () => 'busy' as const);
+
+    await expect(processRecord(record('duplicate'), dependencies))
+      .rejects.toThrow('already being processed');
+    expect(dependencies.getDrinks).not.toHaveBeenCalled();
   });
 });

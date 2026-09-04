@@ -8,19 +8,26 @@ terraform {
       source  = "cloudflare/cloudflare"
       version = "3.19.0"
     }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.7"
+    }
   }
 }
 
 variable "aws_access_key" {
-  type = string
+  type      = string
+  sensitive = true
 }
 
 variable "aws_secret_key" {
-  type = string
+  type      = string
+  sensitive = true
 }
 
 variable "cloudflare_api_key" {
-  type = string
+  type      = string
+  sensitive = true
 }
 
 variable "cloudflare_api_email" {
@@ -32,10 +39,15 @@ variable "influxdb_url" {
 }
 
 variable "influxdb_read_api_token" {
-  type = string
+  type      = string
+  sensitive = true
 }
 
 variable "influxdb_org" {
+  type = string
+}
+
+variable "influxdb_bucket" {
   type = string
 }
 
@@ -59,6 +71,11 @@ provider "cloudflare" {
 
 data "aws_region" "current" {}
 
+resource "random_password" "origin_verify" {
+  length  = 48
+  special = false
+}
+
 resource "aws_apigatewayv2_api" "wetherspoons_api" {
   name          = "wetherspoons-api"
   protocol_type = "HTTP"
@@ -71,6 +88,7 @@ resource "aws_apigatewayv2_api" "wetherspoons_api" {
       "http://localhost",
       "http://localhost:3000",
       "https://spoons.cheap",
+      "https://www.spoons.cheap",
     ]
   }
 }
@@ -80,16 +98,16 @@ resource "aws_apigatewayv2_stage" "wetherspoons_api_stage" {
   name        = "$default"
   auto_deploy = true
   default_route_settings {
-    throttling_burst_limit = 5000
-    throttling_rate_limit  = 5000
+    throttling_burst_limit = 100
+    throttling_rate_limit  = 50
   }
 }
 
 resource "aws_cloudfront_cache_policy" "wetherspoons_api_cache" {
   comment     = "Default policy when CF compression is enabled"
-  default_ttl = 86400
-  max_ttl     = 31536000
-  min_ttl     = 1
+  default_ttl = 300
+  max_ttl     = 3600
+  min_ttl     = 0
   name        = "CachingOptimized"
 
   parameters_in_cache_key_and_forwarded_to_origin {
@@ -138,6 +156,7 @@ resource "aws_cloudfront_response_headers_policy" "wetherspoons_api_cors" {
         "http://localhost:3000",
         "http://spoons.cheap",
         "https://spoons.cheap",
+        "https://www.spoons.cheap",
       ]
     }
   }
@@ -147,6 +166,29 @@ resource "aws_acm_certificate" "wetherspoons_api_certificate" {
   provider          = aws.us-east-1
   domain_name       = "api.spoons.cheap"
   validation_method = "DNS"
+}
+
+resource "cloudflare_record" "api_certificate_validation" {
+  for_each = {
+    for option in aws_acm_certificate.wetherspoons_api_certificate.domain_validation_options :
+    option.domain_name => {
+      name  = option.resource_record_name
+      type  = option.resource_record_type
+      value = option.resource_record_value
+    }
+  }
+
+  zone_id = cloudflare_zone.spoons_cheap.id
+  name    = each.value.name
+  type    = each.value.type
+  value   = each.value.value
+  ttl     = 60
+}
+
+resource "aws_acm_certificate_validation" "wetherspoons_api_certificate" {
+  provider                = aws.us-east-1
+  certificate_arn         = aws_acm_certificate.wetherspoons_api_certificate.arn
+  validation_record_fqdns = [for record in cloudflare_record.api_certificate_validation : record.hostname]
 }
 
 resource "aws_cloudfront_distribution" "wetherspoons_api" {
@@ -176,14 +218,19 @@ resource "aws_cloudfront_distribution" "wetherspoons_api" {
     target_origin_id           = aws_apigatewayv2_api.wetherspoons_api.id
     trusted_key_groups         = []
     trusted_signers            = []
-    viewer_protocol_policy     = "allow-all"
+    viewer_protocol_policy     = "redirect-to-https"
   }
 
   origin {
     connection_attempts = 3
     connection_timeout  = 10
-    domain_name         = "${aws_apigatewayv2_api.wetherspoons_api.id}.execute-api.${data.aws_region.current.name}.amazonaws.com"
+    domain_name         = "${aws_apigatewayv2_api.wetherspoons_api.id}.execute-api.${data.aws_region.current.region}.amazonaws.com"
     origin_id           = aws_apigatewayv2_api.wetherspoons_api.id
+
+    custom_header {
+      name  = "X-Origin-Verify"
+      value = random_password.origin_verify.result
+    }
 
     custom_origin_config {
       http_port                = 80
@@ -205,7 +252,7 @@ resource "aws_cloudfront_distribution" "wetherspoons_api" {
   }
 
   viewer_certificate {
-    acm_certificate_arn            = aws_acm_certificate.wetherspoons_api_certificate.arn
+    acm_certificate_arn            = aws_acm_certificate_validation.wetherspoons_api_certificate.certificate_arn
     cloudfront_default_certificate = false
     minimum_protocol_version       = "TLSv1.2_2021"
     ssl_support_method             = "sni-only"
@@ -238,10 +285,11 @@ resource "cloudflare_record" "www_spoons_cheap" {
 }
 
 module "proxy" {
-  source         = "./proxy"
-  aws_access_key = var.aws_access_key
-  aws_secret_key = var.aws_secret_key
-  api_id         = aws_apigatewayv2_api.wetherspoons_api.id
+  source               = "./proxy"
+  aws_access_key       = var.aws_access_key
+  aws_secret_key       = var.aws_secret_key
+  api_id               = aws_apigatewayv2_api.wetherspoons_api.id
+  origin_verify_secret = random_password.origin_verify.result
 }
 
 module "price" {
@@ -252,6 +300,8 @@ module "price" {
   influxdb_url            = var.influxdb_url
   influxdb_read_api_token = var.influxdb_read_api_token
   influxdb_org            = var.influxdb_org
+  influxdb_bucket         = var.influxdb_bucket
+  origin_verify_secret    = random_password.origin_verify.result
 }
 
 module "rankings" {

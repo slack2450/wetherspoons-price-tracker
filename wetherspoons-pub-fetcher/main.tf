@@ -15,6 +15,17 @@ variable "run_table_name" {
   type = string
 }
 
+variable "schedule_state" {
+  type        = string
+  description = "EventBridge Scheduler state; set to DISABLED while draining for a deployment"
+  default     = "ENABLED"
+
+  validation {
+    condition     = contains(["ENABLED", "DISABLED"], var.schedule_state)
+    error_message = "schedule_state must be ENABLED or DISABLED."
+  }
+}
+
 resource "aws_iam_role" "wetherspoons_pub_fetcher_role" {
   assume_role_policy = jsonencode(
     {
@@ -58,6 +69,7 @@ resource "aws_iam_role_policy" "wetherspoons_pub_fetcher_runs" {
     Version = "2012-10-17"
     Statement = [{
       Action = [
+        "dynamodb:GetItem",
         "dynamodb:PutItem",
         "dynamodb:UpdateItem",
       ]
@@ -156,6 +168,7 @@ resource "aws_iam_role_policy" "scheduler" {
 
 resource "aws_scheduler_schedule" "operational_hours" {
   name                         = "wetherspoons-operational-hours"
+  state                        = var.schedule_state
   schedule_expression          = "cron(0 8-23 * * ? *)"
   schedule_expression_timezone = "Europe/London"
 

@@ -18,15 +18,18 @@ terraform {
 }
 
 variable "aws_access_key" {
-  type = string
+  type      = string
+  sensitive = true
 }
 
 variable "aws_secret_key" {
-  type = string
+  type      = string
+  sensitive = true
 }
 
 variable "cloudflare_api_key" {
-  type = string
+  type      = string
+  sensitive = true
 }
 
 variable "cloudflare_api_email" {
@@ -38,11 +41,13 @@ variable "influxdb_url" {
 }
 
 variable "influxdb_write_api_token" {
-  type = string
+  type      = string
+  sensitive = true
 }
 
 variable "influxdb_read_api_token" {
-  type = string
+  type      = string
+  sensitive = true
 }
 
 variable "influxdb_org" {
@@ -51,6 +56,17 @@ variable "influxdb_org" {
 
 variable "influxdb_bucket" {
   type = string
+}
+
+variable "collector_schedule_state" {
+  type        = string
+  description = "Set to DISABLED to quiesce collectors during coordinated deployments"
+  default     = "ENABLED"
+
+  validation {
+    condition     = contains(["ENABLED", "DISABLED"], var.collector_schedule_state)
+    error_message = "collector_schedule_state must be ENABLED or DISABLED."
+  }
 }
 
 provider "aws" {
@@ -92,6 +108,46 @@ resource "aws_dynamodb_table" "wetherspoons_runs" {
   ttl {
     attribute_name = "expiresAt"
     enabled        = true
+  }
+}
+
+resource "aws_s3_bucket" "wetherspoons_menu_snapshots" {
+  bucket_prefix = "wetherspoons-menu-snapshots-"
+}
+
+resource "aws_s3_bucket_public_access_block" "wetherspoons_menu_snapshots" {
+  bucket = aws_s3_bucket.wetherspoons_menu_snapshots.id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "wetherspoons_menu_snapshots" {
+  bucket = aws_s3_bucket.wetherspoons_menu_snapshots.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+  }
+}
+
+resource "aws_s3_bucket_lifecycle_configuration" "wetherspoons_menu_snapshots" {
+  bucket = aws_s3_bucket.wetherspoons_menu_snapshots.id
+
+  rule {
+    id     = "expire-run-snapshots"
+    status = "Enabled"
+
+    filter {}
+
+    expiration {
+      # DLQ messages live for 14 days. Keep snapshots for another week so a
+      # redrive still has canonical data while DynamoDB TTL deletion lags.
+      days = 21
+    }
   }
 }
 
@@ -160,6 +216,7 @@ module "wetherspoons_pub_fetcher" {
   alarm_sns_topic_arn = aws_sns_topic.wetherspoons_alarms.arn
   run_table_arn       = aws_dynamodb_table.wetherspoons_runs.arn
   run_table_name      = aws_dynamodb_table.wetherspoons_runs.name
+  schedule_state      = var.collector_schedule_state
 }
 
 module "wetherspoons_pub_ranker" {
@@ -176,6 +233,8 @@ module "wetherspoons_menu_fetcher" {
   alarm_sns_topic_arn      = aws_sns_topic.wetherspoons_alarms.arn
   run_table_arn            = aws_dynamodb_table.wetherspoons_runs.arn
   run_table_name           = aws_dynamodb_table.wetherspoons_runs.name
+  menu_snapshot_bucket_arn = aws_s3_bucket.wetherspoons_menu_snapshots.arn
+  menu_snapshot_bucket     = aws_s3_bucket.wetherspoons_menu_snapshots.id
   max_receive_count        = local.menu_max_receive_count
 }
 
@@ -214,4 +273,5 @@ module "wetherspoons_price_api" {
   influxdb_url            = var.influxdb_url
   influxdb_read_api_token = var.influxdb_read_api_token
   influxdb_org            = var.influxdb_org
+  influxdb_bucket         = var.influxdb_bucket
 }

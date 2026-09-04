@@ -29,7 +29,7 @@ module.exports = {
     },
     plugins: [
         new ForkTsCheckerWebpackPlugin(),
-        new IgnorePlugin({ resourceRegExp: /^aws-crt$/ })
+        new IgnorePlugin({ resourceRegExp: /^aws-crt$/ }),
     ],
     cache: {
         type: 'filesystem',

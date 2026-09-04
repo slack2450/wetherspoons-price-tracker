@@ -10,6 +10,11 @@ variable "api_id" {
   type = string
 }
 
+variable "origin_verify_secret" {
+  type      = string
+  sensitive = true
+}
+
 terraform {
   required_providers {
     aws = {
@@ -60,10 +65,16 @@ resource "aws_lambda_function" "wetherspoons_proxy_api" {
   source_code_hash               = filebase64sha256("${path.module}/dist/index.zip")
   handler                        = "index.handler"
   memory_size                    = 128
-  reserved_concurrent_executions = -1
+  reserved_concurrent_executions = 5
   role                           = aws_iam_role.api_role.arn
   runtime                        = "nodejs24.x"
   timeout                        = 30
+
+  environment {
+    variables = {
+      API_ORIGIN_SECRET = var.origin_verify_secret
+    }
+  }
 
   ephemeral_storage {
     size = 512
@@ -116,9 +127,28 @@ resource "aws_apigatewayv2_route" "wetherspoons_api_proxy_route" {
   target    = "integrations/${aws_apigatewayv2_integration.integration.id}"
 }
 
+resource "aws_apigatewayv2_route" "venues" {
+  api_id    = var.api_id
+  route_key = "GET /v2/venues"
+  target    = "integrations/${aws_apigatewayv2_integration.integration.id}"
+}
+
+resource "aws_apigatewayv2_route" "drinks" {
+  api_id    = var.api_id
+  route_key = "GET /v2/drinks/{venueId}"
+  target    = "integrations/${aws_apigatewayv2_integration.integration.id}"
+}
+
 resource "aws_lambda_permission" "wetherspoons_api_proxy_route_permission" {
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.wetherspoons_proxy_api.function_name
   principal     = "apigateway.amazonaws.com"
-  source_arn    = "arn:aws:execute-api:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:${var.api_id}/*/*/v1/proxy/{proxy+}"
+  source_arn    = "arn:aws:execute-api:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:${var.api_id}/*/*/v1/proxy/{proxy+}"
+}
+
+resource "aws_lambda_permission" "public_api" {
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.wetherspoons_proxy_api.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "arn:aws:execute-api:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:${var.api_id}/*/GET/v2/*"
 }
