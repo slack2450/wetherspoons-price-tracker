@@ -168,33 +168,6 @@ resource "aws_acm_certificate" "wetherspoons_api_certificate" {
   validation_method = "DNS"
 }
 
-resource "cloudflare_record" "api_certificate_validation" {
-  for_each = {
-    for option in aws_acm_certificate.wetherspoons_api_certificate.domain_validation_options :
-    option.domain_name => {
-      name  = option.resource_record_name
-      type  = option.resource_record_type
-      value = option.resource_record_value
-    }
-  }
-
-  zone_id = cloudflare_zone.spoons_cheap.id
-  name    = each.value.name
-  type    = each.value.type
-  value   = each.value.value
-  ttl     = 60
-
-  # ACM may request the same validation record as an earlier certificate.
-  # Adopt that record instead of failing an otherwise safe replacement.
-  allow_overwrite = true
-}
-
-resource "aws_acm_certificate_validation" "wetherspoons_api_certificate" {
-  provider                = aws.us-east-1
-  certificate_arn         = aws_acm_certificate.wetherspoons_api_certificate.arn
-  validation_record_fqdns = [for record in cloudflare_record.api_certificate_validation : record.hostname]
-}
-
 resource "aws_cloudfront_distribution" "wetherspoons_api" {
   aliases = [
     "api.spoons.cheap",
@@ -256,7 +229,7 @@ resource "aws_cloudfront_distribution" "wetherspoons_api" {
   }
 
   viewer_certificate {
-    acm_certificate_arn            = aws_acm_certificate_validation.wetherspoons_api_certificate.certificate_arn
+    acm_certificate_arn            = aws_acm_certificate.wetherspoons_api_certificate.arn
     cloudfront_default_certificate = false
     minimum_protocol_version       = "TLSv1.2_2021"
     ssl_support_method             = "sni-only"
