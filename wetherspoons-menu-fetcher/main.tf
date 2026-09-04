@@ -107,14 +107,28 @@ resource "aws_iam_role_policy" "wetherspoons_menu_fetcher_snapshots" {
   role = aws_iam_role.wetherspoons_menu_fetcher_role.id
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [{
-      Action = [
-        "s3:GetObject",
-        "s3:PutObject",
-      ]
-      Effect   = "Allow"
-      Resource = "${var.menu_snapshot_bucket_arn}/runs/*"
-    }]
+    Statement = [
+      {
+        Sid      = "ListRunSnapshots"
+        Action   = ["s3:ListBucket"]
+        Effect   = "Allow"
+        Resource = var.menu_snapshot_bucket_arn
+        Condition = {
+          StringLike = {
+            "s3:prefix" = ["runs/*"]
+          }
+        }
+      },
+      {
+        Sid = "ReadWriteRunSnapshots"
+        Action = [
+          "s3:GetObject",
+          "s3:PutObject",
+        ]
+        Effect   = "Allow"
+        Resource = "${var.menu_snapshot_bucket_arn}/runs/*"
+      },
+    ]
   })
 }
 
@@ -213,7 +227,7 @@ resource "aws_cloudwatch_metric_alarm" "menu_record_failures" {
   comparison_operator = "GreaterThanThreshold"
   evaluation_periods  = 1
   threshold           = 0
-  alarm_description   = "One or more individual pub menu records failed and will be retried"
+  alarm_description   = "One or more individual pub menu records exhausted all configured processing attempts"
   alarm_actions       = [var.alarm_sns_topic_arn]
   treat_missing_data  = "notBreaching"
   namespace           = "WetherspoonsPriceTracker"
