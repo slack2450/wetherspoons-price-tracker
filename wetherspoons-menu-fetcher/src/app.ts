@@ -85,14 +85,14 @@ export async function processRecord(
   for (const drink of result.drinks) {
     const point = new Point('drink')
       .tag('venueId', venueId)
-      .tag('venueName', venue.name)
       .tag('productId', drink.productId.toString())
-      .tag('productName', drink.name)
       .floatField('price', drink.price)
       .floatField('units', drink.units)
+      .stringField('venueName', venue.name)
+      .stringField('productName', drink.name)
       .timestamp(timestamp);
     const currency = (drink as { currency?: unknown }).currency;
-    if (typeof currency === 'string') point.tag('currency', currency);
+    if (typeof currency === 'string') point.stringField('currency', currency);
     writeApi.writePoint(point);
   }
 

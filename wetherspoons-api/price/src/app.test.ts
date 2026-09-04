@@ -73,5 +73,6 @@ describe('price history handler', () => {
 it('builds a grouped, sorted Flux query', () => {
   const query = buildPriceQuery('raw', '123', '456', '7d');
   expect(query).toContain('|> group(columns: [])');
+  expect(query).toContain('|> aggregateWindow(every: 60m, fn: last, createEmpty: false)');
   expect(query).toContain('|> sort(columns: ["_time"])');
 });

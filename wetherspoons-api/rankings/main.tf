@@ -1,11 +1,3 @@
-variable "aws_access_key" {
-  type = string
-}
-
-variable "aws_secret_key" {
-  type = string
-}
-
 variable "api_id" {
   type = string
 }
@@ -17,12 +9,6 @@ terraform {
       version = "~> 6.21.0"
     }
   }
-}
-
-provider "aws" {
-  region     = "eu-west-2"
-  access_key = var.aws_access_key
-  secret_key = var.aws_secret_key
 }
 
 data "aws_region" "current" {}

@@ -18,6 +18,17 @@ variable "schedule_state" {
   }
 }
 
+variable "reserved_concurrent_executions" {
+  type        = number
+  description = "Set to zero while deployment drains any invocation already in progress"
+  default     = -1
+
+  validation {
+    condition     = contains([-1, 0], var.reserved_concurrent_executions)
+    error_message = "reserved_concurrent_executions must be -1 or 0."
+  }
+}
+
 resource "aws_iam_role" "wetherspoons_pub_fetcher_role" {
   assume_role_policy = jsonencode(
     {
@@ -64,7 +75,7 @@ resource "aws_lambda_function" "wetherspoons_pub_fetcher" {
   source_code_hash               = filebase64sha256("${path.module}/dist/index.zip")
   handler                        = "index.handler"
   memory_size                    = 256
-  reserved_concurrent_executions = -1
+  reserved_concurrent_executions = var.reserved_concurrent_executions
   role                           = aws_iam_role.wetherspoons_pub_fetcher_role.arn
   runtime                        = "nodejs24.x"
   timeout                        = 120
@@ -166,21 +177,6 @@ resource "aws_scheduler_schedule" "operational_hours" {
   }
 }
 
-# CloudWatch metric filter for errors
-resource "aws_cloudwatch_log_metric_filter" "pub_fetcher_errors" {
-  name           = "pub-fetcher-errors"
-  log_group_name = aws_cloudwatch_log_group.wetherspoons_pub_fetcher.name
-  pattern        = "[ERROR]"
-
-  metric_transformation {
-    name          = "PubFetcherErrors"
-    namespace     = "WetherspoonsPriceTracker"
-    value         = "1"
-    default_value = 0
-  }
-}
-
-# CloudWatch alarm for error rate > 10%
 resource "aws_cloudwatch_metric_alarm" "pub_fetcher_error_rate" {
   alarm_name          = "pub-fetcher-error-rate-high"
   comparison_operator = "GreaterThanThreshold"
@@ -195,5 +191,23 @@ resource "aws_cloudwatch_metric_alarm" "pub_fetcher_error_rate" {
   statistic           = "Sum"
   dimensions = {
     FunctionName = aws_lambda_function.wetherspoons_pub_fetcher.function_name
+  }
+}
+
+resource "aws_cloudwatch_metric_alarm" "scheduler_target_errors" {
+  alarm_name          = "wetherspoons-scheduler-target-errors"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 1
+  threshold           = 0
+  alarm_description   = "EventBridge Scheduler failed to deliver a collector invocation"
+  alarm_actions       = [var.alarm_sns_topic_arn]
+  treat_missing_data  = "notBreaching"
+  namespace           = "AWS/Scheduler"
+  metric_name         = "TargetErrorCount"
+  period              = 300
+  statistic           = "Sum"
+
+  dimensions = {
+    ScheduleGroup = "default"
   }
 }

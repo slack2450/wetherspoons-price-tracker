@@ -8,6 +8,12 @@ readonly DLQ_NAME="wetherspoons-dead-letter-queue"
 readonly MAX_ATTEMPTS="${QUIESCENCE_MAX_ATTEMPTS:-20}"
 readonly POLL_SECONDS="${QUIESCENCE_POLL_SECONDS:-30}"
 readonly REQUIRED_STABLE_POLLS="${QUIESCENCE_STABLE_POLLS:-3}"
+readonly PUBLISHER_SETTLE_SECONDS="${QUIESCENCE_PUBLISHER_WAIT_SECONDS:-125}"
+
+if [[ ! "$PUBLISHER_SETTLE_SECONDS" =~ ^[0-9]+$ ]]; then
+  echo "QUIESCENCE_PUBLISHER_WAIT_SECONDS must be a non-negative integer" >&2
+  exit 1
+fi
 
 schedule_state="$(aws scheduler get-schedule \
   --region "$AWS_REGION" \
@@ -17,6 +23,11 @@ schedule_state="$(aws scheduler get-schedule \
 if [[ "$schedule_state" != "DISABLED" ]]; then
   echo "Collector schedule is $schedule_state; expected DISABLED" >&2
   exit 1
+fi
+
+if ((PUBLISHER_SETTLE_SECONDS > 0)); then
+  echo "Waiting ${PUBLISHER_SETTLE_SECONDS}s for any publisher invocation already in progress"
+  sleep "$PUBLISHER_SETTLE_SECONDS"
 fi
 
 source_queue_url="$(aws sqs get-queue-url \
