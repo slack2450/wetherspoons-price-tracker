@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { handle } from './app';
-import { buildPriceQuery } from './history';
+import { buildPriceQuery, latestPerHour } from './history';
 import { parsePriceRequest, RequestError } from './request';
 
 const event = {
@@ -70,9 +70,24 @@ describe('price history handler', () => {
   });
 });
 
-it('builds a grouped, sorted Flux query', () => {
+it('builds a narrowly filtered Flux query without fragile server-side aggregation', () => {
   const query = buildPriceQuery('raw', '123', '456', '7d');
-  expect(query).toContain('|> group(columns: [])');
-  expect(query).toContain('|> aggregateWindow(every: 60m, fn: last, createEmpty: false)');
-  expect(query).toContain('|> sort(columns: ["_time"])');
+  expect(query).toContain('r["_measurement"] == "drink"');
+  expect(query).toContain('r["venueId"] == "123"');
+  expect(query).toContain('r["productId"] == "456"');
+  expect(query).not.toContain('aggregateWindow');
+  expect(query).not.toContain('group(columns: [])');
+});
+
+it('keeps the exact latest observation in each hour and sorts the result', () => {
+  expect(latestPerHour([
+    { time: '2026-09-04T11:05:00Z', price: 3.2 },
+    { time: '2026-09-04T10:55:00Z', price: 3.0 },
+    { time: '2026-09-04T11:59:00Z', price: 3.4 },
+    { time: '2026-09-04T10:10:00Z', price: 2.9 },
+    { time: 'invalid', price: 99 },
+  ])).toEqual([
+    { time: '2026-09-04T10:55:00Z', price: 3.0 },
+    { time: '2026-09-04T11:59:00Z', price: 3.4 },
+  ]);
 });

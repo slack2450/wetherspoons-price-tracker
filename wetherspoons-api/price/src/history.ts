@@ -10,13 +10,23 @@ export interface HistoryReader {
 export function buildPriceQuery(bucket: string, venueId: string, productId: string, range: PriceRange): string {
   return `from(bucket: ${JSON.stringify(bucket)})
   |> range(start: -${range}, stop: now())
+  |> filter(fn: (r) => r["_measurement"] == "drink")
   |> filter(fn: (r) => r["productId"] == ${JSON.stringify(productId)})
   |> filter(fn: (r) => r["venueId"] == ${JSON.stringify(venueId)})
   |> filter(fn: (r) => r["_field"] == "price")
-  |> group(columns: [])
-  |> aggregateWindow(every: 60m, fn: last, createEmpty: false)
-  |> keep(columns: ["_time", "_value"])
-  |> sort(columns: ["_time"])`;
+  |> keep(columns: ["_time", "_value"])`;
+}
+
+export function latestPerHour(points: PricePoint[]): PricePoint[] {
+  const hourly = new Map<number, PricePoint>();
+  for (const point of points) {
+    const timestamp = Date.parse(point.time);
+    if (!Number.isFinite(timestamp)) continue;
+    const hour = Math.floor(timestamp / 3_600_000);
+    const current = hourly.get(hour);
+    if (!current || timestamp >= Date.parse(current.time)) hourly.set(hour, point);
+  }
+  return [...hourly.values()].sort((left, right) => left.time.localeCompare(right.time));
 }
 
 export function createHistoryReader(): HistoryReader {
@@ -36,7 +46,10 @@ export function createHistoryReader(): HistoryReader {
           points.push({ time: row._time, price: row._value });
         }
       }
-      return points;
+      // InfluxDB 2.7.12 can panic when aggregateWindow(last) is applied after
+      // grouping old and new tag layouts. Collapse the already-filtered result
+      // here instead, retaining the exact final observed price in each hour.
+      return latestPerHour(points);
     },
   };
 }
