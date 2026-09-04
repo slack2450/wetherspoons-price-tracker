@@ -37,13 +37,11 @@ jobs:
       uses: actions/checkout@v6
     
     - name: Setup Node.js v24
-      if: inputs.phase == 'deploy'
       uses: actions/setup-node@v6
       with:
         node-version: 24
     
     - name: Install dependencies and build
-      if: inputs.phase == 'deploy'
       run: ./build.sh
 
     # Install the latest version of Terraform CLI and configure the Terraform CLI configuration file with a Terraform Cloud user API token
