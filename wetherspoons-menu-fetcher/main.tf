@@ -31,14 +31,6 @@ variable "run_table_name" {
   type = string
 }
 
-variable "menu_snapshot_bucket_arn" {
-  type = string
-}
-
-variable "menu_snapshot_bucket" {
-  type = string
-}
-
 variable "max_receive_count" {
   type        = number
   description = "Number of SQS receives before an individual venue is sent to the DLQ"
@@ -102,36 +94,6 @@ resource "aws_iam_role_policy" "wetherspoons_menu_fetcher_runs" {
   })
 }
 
-resource "aws_iam_role_policy" "wetherspoons_menu_fetcher_snapshots" {
-  name = "menu-snapshots"
-  role = aws_iam_role.wetherspoons_menu_fetcher_role.id
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid      = "ListRunSnapshots"
-        Action   = ["s3:ListBucket"]
-        Effect   = "Allow"
-        Resource = var.menu_snapshot_bucket_arn
-        Condition = {
-          StringLike = {
-            "s3:prefix" = ["runs/*"]
-          }
-        }
-      },
-      {
-        Sid = "ReadWriteRunSnapshots"
-        Action = [
-          "s3:GetObject",
-          "s3:PutObject",
-        ]
-        Effect   = "Allow"
-        Resource = "${var.menu_snapshot_bucket_arn}/runs/*"
-      },
-    ]
-  })
-}
-
 resource "aws_lambda_function" "wetherspoons_menu_fetcher" {
   architectures = [
     "arm64",
@@ -155,7 +117,6 @@ resource "aws_lambda_function" "wetherspoons_menu_fetcher" {
       INFLUXDB_BUCKET          = var.influxdb_bucket
       RUN_TABLE_NAME           = var.run_table_name
       MAX_RECEIVE_COUNT        = tostring(var.max_receive_count)
-      MENU_SNAPSHOT_BUCKET     = var.menu_snapshot_bucket
     }
   }
 

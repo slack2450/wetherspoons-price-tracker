@@ -12,7 +12,7 @@ on:
         - quiesce
         - deploy
         - resume
-        - recover
+        - retire-snapshots
 
 permissions:
   contents: read
@@ -60,11 +60,29 @@ jobs:
       run: terraform fmt -check -recursive
 
     - name: Verify collectors are quiescent before deployment
-      if: inputs.phase == 'deploy'
+      if: inputs.phase == 'deploy' || inputs.phase == 'retire-snapshots'
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_KEY }}
       run: scripts/verify-quiescence.sh
+
+    - name: Empty retired snapshot bucket
+      if: inputs.phase == 'retire-snapshots'
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_KEY }}
+        AWS_DEFAULT_REGION: eu-west-2
+      run: |
+        snapshot_bucket="$(terraform show -json | jq -r '
+          .values.root_module.resources[]
+          | select(.address == "aws_s3_bucket.wetherspoons_menu_snapshots")
+          | .values.bucket
+        ')"
+        if [[ -z "$snapshot_bucket" || "$snapshot_bucket" == "null" ]]; then
+          echo "Could not resolve the snapshot bucket from Terraform state" >&2
+          exit 1
+        fi
+        aws s3 rm "s3://$snapshot_bucket" --recursive
 
     # Save exactly the plan that the next step applies. Quiesce changes only
     # the scheduler; deploy keeps it disabled; resume re-enables it last.
@@ -96,14 +114,8 @@ jobs:
               -var collector_schedule_state=ENABLED \
               -target=module.wetherspoons_pub_fetcher.aws_scheduler_schedule.operational_hours
             ;;
-          recover)
-            # Incident recovery changes only the missing snapshot permission and
-            # its alarm copy. The scheduler remains disabled while DLQ records
-            # are replayed through the repaired consumer.
-            terraform plan -input=false -out=tfplan \
-              -var collector_schedule_state=DISABLED \
-              -target=module.wetherspoons_menu_fetcher.aws_iam_role_policy.wetherspoons_menu_fetcher_snapshots \
-              -target=module.wetherspoons_menu_fetcher.aws_cloudwatch_metric_alarm.menu_record_failures
+          retire-snapshots)
+            terraform plan -input=false -out=tfplan -var collector_schedule_state=DISABLED
             ;;
           *)
             echo "Unsupported deployment phase: $DEPLOY_PHASE" >&2
@@ -134,35 +146,13 @@ jobs:
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_KEY }}
       run: scripts/verify-quiescence.sh
 
-    - name: Redrive preserved failed menu records
-      if: inputs.phase == 'recover'
+    - name: Smoke-test real Influx-only collector
+      if: inputs.phase == 'retire-snapshots'
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_KEY }}
-        AWS_DEFAULT_REGION: eu-west-2
-      run: |
-        dlq_url="$(aws sqs get-queue-url \
-          --queue-name wetherspoons-dead-letter-queue \
-          --query QueueUrl --output text)"
-        dlq_arn="$(aws sqs get-queue-attributes \
-          --queue-url "$dlq_url" \
-          --attribute-names QueueArn \
-          --query 'Attributes.QueueArn' --output text)"
-        visible="$(aws sqs get-queue-attributes \
-          --queue-url "$dlq_url" \
-          --attribute-names ApproximateNumberOfMessages \
-          --query 'Attributes.ApproximateNumberOfMessages' --output text)"
-
-        if [[ "$visible" == "0" ]]; then
-          echo "No visible dead-letter records need recovery."
-          exit 0
-        fi
-
-        echo "Starting managed redrive of $visible preserved records."
-        aws sqs start-message-move-task \
-          --source-arn "$dlq_arn" \
-          --max-number-of-messages-per-second 5
+      run: scripts/smoke-collector.sh
 
     - name: Smoke-test real deployed API
-      if: inputs.phase == 'deploy'
+      if: inputs.phase == 'deploy' || inputs.phase == 'retire-snapshots'
       run: DIRECT_API_BASE="$(terraform output -raw execute_api_endpoint)" node scripts/smoke-deployed-api.mjs
