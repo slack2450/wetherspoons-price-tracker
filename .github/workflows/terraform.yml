@@ -12,6 +12,7 @@ on:
         - quiesce
         - deploy
         - resume
+        - recover
 
 permissions:
   contents: read
@@ -95,6 +96,15 @@ jobs:
               -var collector_schedule_state=ENABLED \
               -target=module.wetherspoons_pub_fetcher.aws_scheduler_schedule.operational_hours
             ;;
+          recover)
+            # Incident recovery changes only the missing snapshot permission and
+            # its alarm copy. The scheduler remains disabled while DLQ records
+            # are replayed through the repaired consumer.
+            terraform plan -input=false -out=tfplan \
+              -var collector_schedule_state=DISABLED \
+              -target=module.wetherspoons_menu_fetcher.aws_iam_role_policy.wetherspoons_menu_fetcher_snapshots \
+              -target=module.wetherspoons_menu_fetcher.aws_cloudwatch_metric_alarm.menu_record_failures
+            ;;
           *)
             echo "Unsupported deployment phase: $DEPLOY_PHASE" >&2
             exit 1
@@ -123,6 +133,35 @@ jobs:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_KEY }}
       run: scripts/verify-quiescence.sh
+
+    - name: Redrive preserved failed menu records
+      if: inputs.phase == 'recover'
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_KEY }}
+        AWS_DEFAULT_REGION: eu-west-2
+      run: |
+        dlq_url="$(aws sqs get-queue-url \
+          --queue-name wetherspoons-dead-letter-queue \
+          --query QueueUrl --output text)"
+        dlq_arn="$(aws sqs get-queue-attributes \
+          --queue-url "$dlq_url" \
+          --attribute-names QueueArn \
+          --query 'Attributes.QueueArn' --output text)"
+        visible="$(aws sqs get-queue-attributes \
+          --queue-url "$dlq_url" \
+          --attribute-names ApproximateNumberOfMessages \
+          --query 'Attributes.ApproximateNumberOfMessages' --output text)"
+
+        if [[ "$visible" == "0" ]]; then
+          echo "No visible dead-letter records need recovery."
+          exit 0
+        fi
+
+        echo "Starting managed redrive of $visible preserved records."
+        aws sqs start-message-move-task \
+          --source-arn "$dlq_arn" \
+          --max-number-of-messages-per-second 5
 
     - name: Smoke-test real deployed API
       if: inputs.phase == 'deploy'
