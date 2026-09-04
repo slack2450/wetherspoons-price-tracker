@@ -108,18 +108,6 @@ npm test
 npm run build
 assert_lambda_bundle ./dist
 cd ..
-cd ./rankings
-npm ci
-npm run build
-assert_lambda_bundle ./dist
-cd ..
-cd ..
-
-# wetherspoons-pub-ranker
-cd ./wetherspoons-pub-ranker
-npm ci
-npm run build
-assert_lambda_bundle ./dist
 cd ..
 
 echo "Build succesful!"
