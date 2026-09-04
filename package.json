@@ -5,24 +5,25 @@
   "name": "wetherspoons-price-tracker",
   "description": "This repository contains the code for some AWS Lambda functions to track the price of every drink in every Wetherspoons pub.",
   "version": "1.0.1",
+  "private": true,
   "main": "index.js",
+  "engines": {
+    "node": ">=24"
+  },
   "scripts": {
     "terraform-format": "terraform fmt -check -recursive ."
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/slack69/wetherspoons-price-tracker.git"
+    "url": "git+https://github.com/slack2450/wetherspoons-price-tracker.git"
   },
   "author": "Joss Bird",
   "license": "UNLICENSED",
   "bugs": {
-    "url": "https://github.com/slack69/wetherspoons-price-tracker/issues"
+    "url": "https://github.com/slack2450/wetherspoons-price-tracker/issues"
   },
-  "homepage": "https://github.com/slack69/wetherspoons-price-tracker#readme",
+  "homepage": "https://github.com/slack2450/wetherspoons-price-tracker#readme",
   "pre-commit": [
     "terraform-format"
-  ],
-  "dependencies": {
-    "@influxdata/influxdb-client": "^1.35.0"
-  }
+  ]
 }
