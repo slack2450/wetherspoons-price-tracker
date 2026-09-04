@@ -72,6 +72,8 @@ resource "aws_iam_role" "api_role" {
 
 resource "aws_lambda_function" "wetherspoons_price_api" {
 
+  # This account's concurrency quota is the AWS minimum, which must remain
+  # entirely unreserved. Downstream timeouts provide the overload boundary.
   function_name = "wetherspoons-api-price"
 
   architectures = [
@@ -82,7 +84,7 @@ resource "aws_lambda_function" "wetherspoons_price_api" {
   source_code_hash               = filebase64sha256("${path.module}/dist/index.zip")
   handler                        = "index.handler"
   memory_size                    = 128
-  reserved_concurrent_executions = 5
+  reserved_concurrent_executions = -1
   role                           = aws_iam_role.api_role.arn
   runtime                        = "nodejs24.x"
   timeout                        = 30

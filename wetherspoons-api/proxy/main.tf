@@ -55,6 +55,8 @@ resource "aws_iam_role" "api_role" {
 
 resource "aws_lambda_function" "wetherspoons_proxy_api" {
 
+  # This account's concurrency quota is the AWS minimum, which must remain
+  # entirely unreserved. API Gateway remains the public request boundary.
   function_name = "wetherspoons-api-proxy"
 
   architectures = [
@@ -65,14 +67,17 @@ resource "aws_lambda_function" "wetherspoons_proxy_api" {
   source_code_hash               = filebase64sha256("${path.module}/dist/index.zip")
   handler                        = "index.handler"
   memory_size                    = 128
-  reserved_concurrent_executions = 5
+  reserved_concurrent_executions = -1
   role                           = aws_iam_role.api_role.arn
   runtime                        = "nodejs24.x"
   timeout                        = 30
 
   environment {
+    # Keep one value known during planning. AWS provider 6.21 can otherwise
+    # collapse a wholly unknown environment block and reject it during apply.
     variables = {
-      API_ORIGIN_SECRET = var.origin_verify_secret
+      API_ORIGIN_SECRET   = var.origin_verify_secret
+      ORIGIN_VERIFICATION = "enabled"
     }
   }
 

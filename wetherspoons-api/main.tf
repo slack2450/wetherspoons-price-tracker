@@ -183,6 +183,10 @@ resource "cloudflare_record" "api_certificate_validation" {
   type    = each.value.type
   value   = each.value.value
   ttl     = 60
+
+  # ACM may request the same validation record as an earlier certificate.
+  # Adopt that record instead of failing an otherwise safe replacement.
+  allow_overwrite = true
 }
 
 resource "aws_acm_certificate_validation" "wetherspoons_api_certificate" {
