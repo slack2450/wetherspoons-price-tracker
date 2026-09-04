@@ -37,11 +37,13 @@ jobs:
       uses: actions/checkout@v6
     
     - name: Setup Node.js v24
+      if: inputs.phase == 'deploy'
       uses: actions/setup-node@v6
       with:
         node-version: 24
     
     - name: Install dependencies and build
+      if: inputs.phase == 'deploy'
       run: ./build.sh
 
     # Install the latest version of Terraform CLI and configure the Terraform CLI configuration file with a Terraform Cloud user API token
@@ -91,7 +93,9 @@ jobs:
             terraform plan -input=false -out=tfplan -var collector_schedule_state=DISABLED
             ;;
           resume)
-            terraform plan -input=false -out=tfplan -var collector_schedule_state=ENABLED
+            terraform plan -input=false -out=tfplan \
+              -var collector_schedule_state=ENABLED \
+              -target=module.wetherspoons_pub_fetcher.aws_scheduler_schedule.operational_hours
             ;;
           *)
             echo "Unsupported deployment phase: $DEPLOY_PHASE" >&2
