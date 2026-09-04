@@ -109,10 +109,10 @@ resource "aws_iam_role_policy" "wetherspoons_menu_fetcher_snapshots" {
     Version = "2012-10-17"
     Statement = [
       {
-        Sid       = "ListRunSnapshots"
-        Action    = ["s3:ListBucket"]
-        Effect    = "Allow"
-        Resource  = var.menu_snapshot_bucket_arn
+        Sid      = "ListRunSnapshots"
+        Action   = ["s3:ListBucket"]
+        Effect   = "Allow"
+        Resource = var.menu_snapshot_bucket_arn
         Condition = {
           StringLike = {
             "s3:prefix" = ["runs/*"]
