@@ -1,3 +1,9 @@
+import {
+  collectorsAreOperational,
+  londonHour,
+  validateDrinksResult,
+} from './deployed-api-contract.mjs';
+
 const API_BASE = 'https://api.spoons.cheap';
 const DIRECT_API_BASE = process.env.DIRECT_API_BASE;
 const RETRIES = 12;
@@ -36,27 +42,34 @@ if (!Array.isArray(venues) || venues.length < 500) {
 }
 
 let available;
+let checkedVenue;
 for (const venue of venues.slice(0, 20)) {
   if (!Number.isSafeInteger(venue?.venueRef) || venue.venueRef <= 0) continue;
   const result = await getJson(`/v2/drinks/${venue.venueRef}?range=deploy-${CACHE_BUSTER}`);
-  if (!result || !Array.isArray(result.drinks)) throw new Error('Deployed drinks route returned an invalid result');
-  if (result.partial === true) throw new Error(`Deployed drinks route returned a partial menu for ${venue.venueRef}`);
+  checkedVenue ??= venue;
+  validateDrinksResult(result);
   if (result.status === 'available' && result.drinks.length > 0) {
     available = { venue, drink: result.drinks[0] };
     break;
   }
 }
 
-if (!available) throw new Error('No complete deployed drinks response found in the first 20 venues');
-if (!Number.isSafeInteger(available.drink.productId) || available.drink.productId <= 0) {
+if (!available && collectorsAreOperational()) {
+  throw new Error('No complete deployed drinks response found during collector operating hours');
+}
+if (!available && !checkedVenue) throw new Error('No valid deployed venue was available for route checks');
+
+const venueRef = available?.venue.venueRef ?? checkedVenue.venueRef;
+const productId = available?.drink.productId ?? 1;
+if (!Number.isSafeInteger(productId) || productId <= 0) {
   throw new Error('Deployed drinks route returned an invalid product ID');
 }
 
 const history = await getJson(
-  `/v2/price/${available.venue.venueRef}/${available.drink.productId}?range=24h`,
+  `/v2/price/${venueRef}/${productId}?range=24h`,
 );
 if (!Array.isArray(history)) throw new Error('Deployed price route returned a non-array response');
 
 console.log(
-  `DEPLOYED_API_SMOKE_OK venues=${venues.length} venue=${available.venue.venueRef} product=${available.drink.productId} history=${history.length}`,
+  `DEPLOYED_API_SMOKE_OK venues=${venues.length} venue=${venueRef} product=${productId} history=${history.length} londonHour=${londonHour()} menu=${available ? 'available' : 'closed-hours'}`,
 );

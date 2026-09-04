@@ -76,6 +76,8 @@ if [[ "${1:-}" == "--self-test-scanner" ]]; then
     exit
 fi
 
+node --test scripts/*.test.mjs
+
 # wetherspoons-pub-fetcher
 cd ./wetherspoons-pub-fetcher
 npm ci
