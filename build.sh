@@ -41,6 +41,11 @@ assert_lambda_bundle() {
     # output. This catches machine-specific paths in lazy or unexpected chunks.
     scan_file="$(mktemp)"
     for archive_entry in "${archive_entries[@]}"; do
+        if [[ "$archive_entry" == */ || ! -f "$bundle_dir/$archive_entry" ]]; then
+            echo "Lambda archive contains an unexpected entry: $archive:$archive_entry" >&2
+            rm -f -- "$scan_file"
+            return 1
+        fi
         unzip -p "$archive" "$archive_entry" > "$scan_file"
         if grep -aFq "file:///" "$scan_file"; then
             echo "Lambda archive entry contains a build-machine file URL: $archive:$archive_entry" >&2
@@ -60,7 +65,7 @@ self_test_bundle_scanner() {
         zip -q index.zip index.js
         printf '%s\n' '//# sourceMappingURL=file:///build-machine/private/source.js.map' > poison.js
         zip -q index.zip poison.js
-        rm -f poison.js
+        printf '%s\n' 'exports.clean = true;' > poison.js
     )
     if (assert_lambda_bundle "$test_dir") >/dev/null 2>&1; then
         echo "Bundle scanner self-test failed to detect an archived build-machine path" >&2
@@ -77,6 +82,7 @@ if [[ "${1:-}" == "--self-test-scanner" ]]; then
 fi
 
 node --test scripts/*.test.mjs
+scripts/package-lambda.sh --self-test
 
 # wetherspoons-pub-fetcher
 cd ./wetherspoons-pub-fetcher

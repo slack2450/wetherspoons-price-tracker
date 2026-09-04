@@ -4,7 +4,7 @@
   "description": "",
   "main": "app.js",
   "scripts": {
-    "build": "webpack --mode production && cd dist && zip index.zip *.js",
+    "build": "webpack --mode production && ../scripts/package-lambda.sh dist",
     "build:dev": "webpack --mode development",
     "test": "vitest run"
   },
