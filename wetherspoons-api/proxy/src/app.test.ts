@@ -55,7 +55,7 @@ describe('public menu API', () => {
     expect(dependency.drinks).toHaveBeenCalledTimes(2);
   });
 
-  it('adds EUR during a rolling upgrade from a package without currency', async () => {
+  it('preserves the currency supplied by the v3 upstream contract', async () => {
     const dependency = api();
     dependency.venues = vi.fn(async () => [{
       ...venue,
@@ -63,7 +63,7 @@ describe('public menu API', () => {
     }]);
     dependency.drinks = vi.fn(async () => ({
       status: 'available' as const,
-      drinks: [{ name: 'Lager', units: 2, productId: 4, price: 4, ppu: 2 }] as never,
+      drinks: [{ name: 'Lager', units: 2, productId: 4, price: 4, ppu: 2, currency: 'EUR' }],
     }));
     const result = await handle(event('/v2/drinks/123', '123'), dependency, secret);
     expect(JSON.parse(result.body).drinks[0].currency).toBe('EUR');

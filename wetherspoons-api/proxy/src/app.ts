@@ -3,14 +3,6 @@ import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from 'aws-lambda
 import { getDrinks, type HighLevelVenue, venues } from 'wetherspoons-api';
 
 const SERVER_UPSTREAM_DEADLINE_MS = 25_000;
-type RequestOptions = { timeoutMs: number };
-const venuesWithOptions = venues as unknown as (
-  options: RequestOptions,
-) => Promise<HighLevelVenue[]>;
-const getDrinksWithOptions = getDrinks as unknown as (
-  venue: Pick<HighLevelVenue, 'venueRef'>,
-  options: RequestOptions,
-) => ReturnType<typeof getDrinks>;
 
 export interface PublicApi {
   venues(): Promise<HighLevelVenue[]>
@@ -18,8 +10,8 @@ export interface PublicApi {
 }
 
 const defaultApi: PublicApi = {
-  venues: () => venuesWithOptions({ timeoutMs: SERVER_UPSTREAM_DEADLINE_MS }),
-  drinks: venue => getDrinksWithOptions(venue, { timeoutMs: SERVER_UPSTREAM_DEADLINE_MS }),
+  venues: () => venues({ timeoutMs: SERVER_UPSTREAM_DEADLINE_MS }),
+  drinks: venue => getDrinks(venue, { timeoutMs: SERVER_UPSTREAM_DEADLINE_MS }),
 };
 
 type JsonResponse = {
@@ -69,23 +61,6 @@ async function knownVenues(api: PublicApi): Promise<HighLevelVenue[]> {
   }
 }
 
-function ensureCurrency(
-  result: Awaited<ReturnType<PublicApi['drinks']>>,
-  venue: HighLevelVenue,
-): Awaited<ReturnType<PublicApi['drinks']>> {
-  if (result.status !== 'available' || result.drinks.every(
-    drink => typeof (drink as { currency?: unknown }).currency === 'string',
-  )) return result;
-
-  // Temporary compatibility for 2.1.1. The coordinated v3 package supplies
-  // currency directly; no second venue-list request is needed here.
-  const currency = venue.address.country?.code === 'IE' ? 'EUR' : 'GBP';
-  return {
-    status: 'available',
-    drinks: result.drinks.map(drink => ({ ...drink, currency })),
-  };
-}
-
 export async function handle(
   event: APIGatewayProxyEventV2,
   api: PublicApi = defaultApi,
@@ -105,7 +80,7 @@ export async function handle(
       const venue = (await knownVenues(api)).find(candidate => candidate.venueRef === venueRef);
       if (!venue) return response(404, { error: 'Venue not found' }, 300);
       const result = await api.drinks(venue);
-      return response(200, ensureCurrency(result, venue), 300);
+      return response(200, result, 300);
     }
     return response(404, { error: 'Not found' });
   } catch (error) {

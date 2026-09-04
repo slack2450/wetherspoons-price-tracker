@@ -15,10 +15,6 @@ export { isRunComplete } from './run-ledger';
 
 type TerminalOutcome = 'written' | 'unavailable';
 const SERVER_UPSTREAM_DEADLINE_MS = 25_000;
-const getDrinksWithOptions = getDrinks as unknown as (
-  venue: RunMessage['venue'],
-  options: { timeoutMs: number },
-) => Promise<DrinksResult>;
 
 interface RunMessage {
   runId: string
@@ -67,7 +63,7 @@ function parseRecord(record: SQSRecord): RunMessage {
 }
 
 const defaultDependencies: Dependencies = {
-  getDrinks: venue => getDrinksWithOptions(venue, { timeoutMs: SERVER_UPSTREAM_DEADLINE_MS }),
+  getDrinks: venue => getDrinks(venue, { timeoutMs: SERVER_UPSTREAM_DEADLINE_MS }),
   createWriteApi: () => new InfluxDB({
     url: process.env.INFLUXDB_URL!,
     token: process.env.INFLUXDB_WRITE_API_TOKEN!,
