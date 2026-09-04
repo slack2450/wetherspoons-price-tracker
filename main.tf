@@ -111,46 +111,6 @@ resource "aws_dynamodb_table" "wetherspoons_runs" {
   }
 }
 
-resource "aws_s3_bucket" "wetherspoons_menu_snapshots" {
-  bucket_prefix = "wetherspoons-menu-snapshots-"
-}
-
-resource "aws_s3_bucket_public_access_block" "wetherspoons_menu_snapshots" {
-  bucket = aws_s3_bucket.wetherspoons_menu_snapshots.id
-
-  block_public_acls       = true
-  block_public_policy     = true
-  ignore_public_acls      = true
-  restrict_public_buckets = true
-}
-
-resource "aws_s3_bucket_server_side_encryption_configuration" "wetherspoons_menu_snapshots" {
-  bucket = aws_s3_bucket.wetherspoons_menu_snapshots.id
-
-  rule {
-    apply_server_side_encryption_by_default {
-      sse_algorithm = "AES256"
-    }
-  }
-}
-
-resource "aws_s3_bucket_lifecycle_configuration" "wetherspoons_menu_snapshots" {
-  bucket = aws_s3_bucket.wetherspoons_menu_snapshots.id
-
-  rule {
-    id     = "expire-run-snapshots"
-    status = "Enabled"
-
-    filter {}
-
-    expiration {
-      # DLQ messages live for 14 days. Keep snapshots for another week so a
-      # redrive still has canonical data while DynamoDB TTL deletion lags.
-      days = 21
-    }
-  }
-}
-
 variable "alarm_email" {
   type        = string
   description = "Email address to receive CloudWatch alarm notifications"
@@ -233,8 +193,6 @@ module "wetherspoons_menu_fetcher" {
   alarm_sns_topic_arn      = aws_sns_topic.wetherspoons_alarms.arn
   run_table_arn            = aws_dynamodb_table.wetherspoons_runs.arn
   run_table_name           = aws_dynamodb_table.wetherspoons_runs.name
-  menu_snapshot_bucket_arn = aws_s3_bucket.wetherspoons_menu_snapshots.arn
-  menu_snapshot_bucket     = aws_s3_bucket.wetherspoons_menu_snapshots.id
   max_receive_count        = local.menu_max_receive_count
 }
 

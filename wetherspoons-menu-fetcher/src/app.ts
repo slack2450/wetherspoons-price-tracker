@@ -9,7 +9,6 @@ import {
   highLevelVenueSchema,
 } from 'wetherspoons-api';
 import { claimVenue, ClaimOutcome, markTerminal } from './run-ledger';
-import { loadSnapshot, MenuSnapshot, saveSnapshot } from './snapshot-store';
 
 export { isRunComplete } from './run-ledger';
 
@@ -31,8 +30,6 @@ export interface Dependencies {
     leaseToken: string,
     observedAt: string,
   ) => Promise<ClaimOutcome>
-  loadSnapshot: (runId: string, venueId: string) => Promise<MenuSnapshot | undefined>
-  saveSnapshot: (runId: string, venueId: string, snapshot: MenuSnapshot) => Promise<void>
   markTerminal: (
     runId: string,
     venueId: string,
@@ -82,8 +79,6 @@ const defaultDependencies: Dependencies = {
       },
     ),
   claimVenue,
-  loadSnapshot,
-  saveSnapshot,
   markTerminal,
 };
 
@@ -101,50 +96,25 @@ export async function processRecord(
   }
   if (claim === 'busy') throw new Error(`Venue ${venueId} is already being processed`);
 
-  let snapshot = await dependencies.loadSnapshot(runId, venueId);
-  if (!snapshot) {
-    const result = await dependencies.getDrinks(venue);
-    if ((result as { partial?: boolean }).partial) {
-      throw new Error(`Refusing to persist a partial menu for venue ${venueId}`);
-    }
-    await dependencies.saveSnapshot(runId, venueId, {
-      observedAt,
-      venueId,
-      venueName: venue.name,
-      result,
-    });
-    // At an expired-lease boundary another worker's immutable snapshot may
-    // have won the conditional put, so always reload the canonical object.
-    snapshot = await dependencies.loadSnapshot(runId, venueId);
-    if (!snapshot) throw new Error(`Menu snapshot was not readable after saving for venue ${venueId}`);
-  }
-
-  if (snapshot.observedAt !== observedAt) {
-    throw new Error(`Snapshot for run ${runId} venue ${venueId} has a conflicting observedAt`);
-  }
-  if (snapshot.venueId !== venueId) {
-    throw new Error(`Snapshot for run ${runId} venue ${venueId} has a conflicting venue ID`);
-  }
-  const { result } = snapshot;
-
-  if (result.status === 'unavailable') {
-    await dependencies.markTerminal(runId, venueId, leaseToken, 'unavailable');
-    console.log(
-      `MENU_UNAVAILABLE runId=${runId} venue=${snapshot.venueName} (${venueId}) reason=${result.reason}`,
-    );
-    return;
-  }
-
+  const result = await dependencies.getDrinks(venue);
   if ((result as { partial?: boolean }).partial) {
     throw new Error(`Refusing to persist a partial menu for venue ${venueId}`);
   }
 
+  if (result.status === 'unavailable') {
+    await dependencies.markTerminal(runId, venueId, leaseToken, 'unavailable');
+    console.log(
+      `MENU_UNAVAILABLE runId=${runId} venue=${venue.name} (${venueId}) reason=${result.reason}`,
+    );
+    return;
+  }
+
   const writeApi = dependencies.createWriteApi();
-  const timestamp = new Date(snapshot.observedAt);
+  const timestamp = new Date(observedAt);
   for (const drink of result.drinks) {
     const point = new Point('drink')
-      .tag('venueId', snapshot.venueId)
-      .tag('venueName', snapshot.venueName)
+      .tag('venueId', venueId)
+      .tag('venueName', venue.name)
       .tag('productId', drink.productId.toString())
       .tag('productName', drink.name)
       .floatField('price', drink.price)
@@ -160,7 +130,7 @@ export async function processRecord(
   await writeApi.close();
   await dependencies.markTerminal(runId, venueId, leaseToken, 'written');
   console.log(
-    `MENU_WRITTEN runId=${runId} venue=${snapshot.venueName} (${venueId}) points=${result.drinks.length}`,
+    `MENU_WRITTEN runId=${runId} venue=${venue.name} (${venueId}) points=${result.drinks.length}`,
   );
 }
 

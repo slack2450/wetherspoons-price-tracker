@@ -38,7 +38,6 @@ function record(messageId: string, venueRef = venue.venueRef): SQSRecord {
 }
 
 function unavailableDependencies(): Dependencies {
-  let snapshot: Awaited<ReturnType<Dependencies['loadSnapshot']>>;
   return {
     getDrinks: vi.fn(async () => ({
       status: 'unavailable' as const,
@@ -50,8 +49,6 @@ function unavailableDependencies(): Dependencies {
       close: vi.fn(async () => undefined),
     })),
     claimVenue: vi.fn(async () => 'claimed' as const),
-    loadSnapshot: vi.fn(async () => snapshot),
-    saveSnapshot: vi.fn(async (_runId, _venueId, saved) => { snapshot = saved; }),
     markTerminal: vi.fn(async () => undefined),
   };
 }
@@ -156,10 +153,10 @@ describe('menu fetcher', () => {
     expect(lines).toHaveLength(2);
     expect(lines[0]).toBe(lines[1]);
     expect(dependencies.markTerminal).toHaveBeenCalledTimes(2);
-    expect(dependencies.getDrinks).toHaveBeenCalledOnce();
+    expect(dependencies.getDrinks).toHaveBeenCalledTimes(2);
   });
 
-  it('uses the immutable snapshot venue name when a retry message has changed', async () => {
+  it('uses the current queue message venue name when retry metadata changes', async () => {
     const dependencies = unavailableDependencies();
     const lines: string[] = [];
     dependencies.getDrinks = vi.fn(async () => ({
@@ -184,31 +181,10 @@ describe('menu fetcher', () => {
     renamed.body = JSON.stringify(envelope);
 
     await expect(processRecord(renamed, dependencies)).resolves.toBeUndefined();
-    expect(dependencies.getDrinks).toHaveBeenCalledOnce();
+    expect(dependencies.getDrinks).toHaveBeenCalledTimes(2);
     expect(lines).toHaveLength(2);
-    expect(lines[1]).toBe(lines[0]);
-    expect(lines[1]).toContain('venueName=Test\\ Pub');
-    expect(lines[1]).not.toContain('Renamed');
+    expect(lines[1]).toContain('venueName=Renamed\\ Pub');
     expect(dependencies.markTerminal).toHaveBeenCalledTimes(2);
-  });
-
-  it('rejects retry messages with a non-canonical snapshot timestamp', async () => {
-    const dependencies = unavailableDependencies();
-    await processRecord(record('first'), dependencies);
-
-    const changedTime = record('retry');
-    const envelope = JSON.parse(changedTime.body) as { Message: string };
-    const message = JSON.parse(envelope.Message) as {
-      runId: string
-      observedAt: string
-      venue: typeof venue
-    };
-    message.observedAt = '2026-08-12T22:00:00.000Z';
-    envelope.Message = JSON.stringify(message);
-    changedTime.body = JSON.stringify(envelope);
-
-    await expect(processRecord(changedTime, dependencies)).rejects.toThrow('conflicting observedAt');
-    expect(dependencies.createWriteApi).not.toHaveBeenCalled();
   });
 
   it('short-circuits a completed duplicate before fetching or writing', async () => {
@@ -218,7 +194,6 @@ describe('menu fetcher', () => {
     await processRecord(record('duplicate'), dependencies);
 
     expect(dependencies.getDrinks).not.toHaveBeenCalled();
-    expect(dependencies.loadSnapshot).not.toHaveBeenCalled();
     expect(dependencies.createWriteApi).not.toHaveBeenCalled();
     expect(dependencies.markTerminal).not.toHaveBeenCalled();
   });
