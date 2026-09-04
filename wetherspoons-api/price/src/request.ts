@@ -17,8 +17,14 @@ export function parsePriceRequest(
   const productId = path?.productId;
   const range = query?.range;
   if (!venueId || !productId) throw new RequestError('Missing venueId or productId', 404);
-  if (!/^\d{1,10}$/.test(venueId) || !/^\d{1,10}$/.test(productId)) {
-    throw new RequestError('Venue and product IDs must be 1 to 10 digits', 400);
+  if (!/^\d{1,10}$/.test(venueId)) {
+    throw new RequestError('Venue IDs must be 1 to 10 digits', 400);
+  }
+  // Current Wetherspoons product IDs are 11 digits. Keep a numeric-only
+  // boundary and let the safe-integer check below reject values JavaScript
+  // cannot represent exactly.
+  if (!/^\d{1,16}$/.test(productId)) {
+    throw new RequestError('Product IDs must be 1 to 16 digits', 400);
   }
   const numericVenueId = Number(venueId);
   const numericProductId = Number(productId);

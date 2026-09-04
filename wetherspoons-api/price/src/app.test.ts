@@ -16,9 +16,18 @@ describe('price request validation', () => {
     });
   });
 
+  it('accepts current 11-digit Wetherspoons product IDs', () => {
+    expect(parsePriceRequest(
+      { venueId: '7618', productId: '10000009517' },
+      { range: '24h' },
+    )).toEqual({ venueId: '7618', productId: '10000009517', range: '24h' });
+  });
+
   it.each([
     [{ venueId: '1\") |> die()', productId: '2' }, { range: '24h' }],
     [{ venueId: '12345678901', productId: '2' }, { range: '24h' }],
+    [{ venueId: '1', productId: '9007199254740992' }, { range: '24h' }],
+    [{ venueId: '1', productId: '10000000000000000' }, { range: '24h' }],
     [{ venueId: '1', productId: '0' }, { range: '24h' }],
     [{ venueId: '1', productId: '2' }, { range: 'forever' }],
   ])('rejects unsafe input', (path, query) => {
