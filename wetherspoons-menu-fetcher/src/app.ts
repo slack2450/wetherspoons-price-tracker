@@ -4,6 +4,7 @@ import { InfluxDB, WriteApi } from '@influxdata/influxdb-client';
 import { SQSBatchItemFailure, SQSBatchResponse, SQSEvent, SQSRecord } from 'aws-lambda';
 import { getDrinks } from 'wetherspoons-api';
 import { failureContext, PrepareDependencies, prepareRecord } from './menu-record';
+import { errorDetails } from './error-details';
 const SERVER_UPSTREAM_DEADLINE_MS = 25_000;
 
 export interface Dependencies extends PrepareDependencies {
@@ -99,12 +100,12 @@ export async function handle(
     if (receiveCount >= maxReceiveCount) {
       console.error(
         `MENU_RECORD_FAILED messageId=${record.messageId} attempts=${receiveCount} ${failureContext(record)}`,
-        error,
+        JSON.stringify(errorDetails(error)),
       );
     } else {
       console.warn(
-        `MENU_RECORD_RETRY messageId=${record.messageId} attempt=${receiveCount}/${maxReceiveCount}`,
-        error,
+        `MENU_RECORD_RETRY messageId=${record.messageId} attempt=${receiveCount}/${maxReceiveCount} ${failureContext(record)}`,
+        JSON.stringify(errorDetails(error)),
       );
     }
     batchItemFailures.push({ itemIdentifier: record.messageId });

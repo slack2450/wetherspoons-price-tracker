@@ -2,8 +2,36 @@ import { SQSEvent } from 'aws-lambda';
 import { describe, expect, it, vi } from 'vitest';
 import { handle } from './app';
 import { record, unavailableDependencies } from './test-fixtures';
+import { MenuRequestError, UpstreamHttpError } from 'wetherspoons-api';
 
 describe('menu fetcher', () => {
+  it('logs the original failed menu and HTTP cause while retrying a partial snapshot', async () => {
+    const dependencies = unavailableDependencies();
+    dependencies.getDrinks = vi.fn(async () => ({
+      status: 'available' as const,
+      drinks: [],
+      partial: true,
+      failures: [new MenuRequestError({
+        stage: 'menu-detail', venueRef: 7578, salesAreaId: 1111, menuId: 10287, menuName: 'Specials',
+      }, new UpstreamHttpError('Upstream menu error Z556', 500))],
+    }));
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    try {
+      await expect(handle({ Records: [record('partial', 7578)] } as SQSEvent, dependencies)).resolves.toEqual({
+        batchItemFailures: [{ itemIdentifier: 'partial' }],
+      });
+      expect(warn.mock.calls[0]?.[0]).toContain('venueId=7578 runDay=2026-08-12');
+      expect(JSON.parse(warn.mock.calls[0]?.[1])).toMatchObject({ errors: [{
+        context: { menuId: 10287, menuName: 'Specials' },
+        cause: { status: 500, message: 'Upstream menu error Z556' },
+      }] });
+      expect(dependencies.createWriteApi).not.toHaveBeenCalled();
+      expect(dependencies.getDrinks).toHaveBeenCalledTimes(1);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
   it('returns only failed SQS records for retry', async () => {
     const dependencies = unavailableDependencies();
     dependencies.getDrinks = vi.fn(async currentVenue => {
@@ -112,8 +140,8 @@ describe('menu fetcher', () => {
     await handle({ Records: [finalAttempt] } as SQSEvent, dependencies);
 
     expect(error).toHaveBeenCalledWith(
-      'MENU_RECORD_FAILED messageId=failure attempts=5 venueId=1234 runDay=2026-08-12 venueName="Test Pub"',
-      expect.any(Error),
+      'MENU_RECORD_FAILED messageId=failure attempts=5 venueId=1234 runDay=2026-08-12 venueName="Test Pub" observedAt=2026-08-12T21:00:00.000Z runId="run-1"',
+      JSON.stringify({ name: 'Error', message: 'upstream failed' }),
     );
     error.mockRestore();
   });

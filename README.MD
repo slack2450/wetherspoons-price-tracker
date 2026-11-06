@@ -46,6 +46,19 @@ and publish monitoring metrics; it cannot modify queues or collection data.
 Run `./build.sh` to test and package all functions, including the Python monitor.
 Run `terraform fmt -check -recursive` and `terraform validate` before deployment.
 Production uses the existing manually dispatched `Deploy production` workflow.
+For this compatible logging/monitoring change, dispatch it with
+`monitoring_only=true`. This path creates and invokes the new monitor first,
+then applies only the collector code and three existing alarm updates. It
+checks saved plans against an explicit resource allowlist, rejects deletions
+and collector configuration changes, verifies the deployed code hash and alarm
+definitions, and verifies the collector schedule was left unchanged. Historical
+DLQ messages do not need to be drained or deleted for this scoped deployment.
 After deployment, check the monitor's first successful hourly run, its three
 custom metrics, and the updated alarm definitions. Do not infer success from
 an `OK` alarm alone: a missing monitor result must also be investigated.
+
+Failure and retry logs include the original collection timestamp, pub identity,
+menu/sales-area identity, HTTP status, and bounded nested error or schema details.
+The collector pins `wetherspoons-api` to the tested diagnostics source commit;
+replace that pin with a registry version after the library's normal publish
+workflow releases it. No retry timing or incomplete-snapshot handling changed.
