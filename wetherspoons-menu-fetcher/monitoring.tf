@@ -15,14 +15,14 @@ resource "aws_cloudwatch_metric_alarm" "menu_record_failures" {
   alarm_name          = "menu-record-failures"
   comparison_operator = "GreaterThanThreshold"
   evaluation_periods  = 1
-  threshold           = 0
-  alarm_description   = "One or more individual pub menu records exhausted all configured processing attempts"
+  threshold           = 9
+  alarm_description   = "At least 10 distinct pubs exhausted processing attempts in the last hour; isolated failures are assessed across UK calendar days"
   alarm_actions       = [var.alarm_sns_topic_arn]
   treat_missing_data  = "notBreaching"
   namespace           = "WetherspoonsPriceTracker"
-  metric_name         = "MenuRecordFailures"
-  period              = 300
-  statistic           = "Sum"
+  metric_name         = "FailedPubsLastHour"
+  period              = 3600
+  statistic           = "Maximum"
 }
 
 resource "aws_cloudwatch_metric_alarm" "menu_fetcher_error_rate" {

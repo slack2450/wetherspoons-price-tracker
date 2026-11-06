@@ -46,6 +46,20 @@ function parseRecord(record: SQSRecord): RunMessage {
   };
 }
 
+// Attribute retries to the original collection day, even if they finish after
+// midnight. Never let malformed input hide the original processing failure.
+export function failureContext(record: SQSRecord): string {
+  try {
+    const { venue, observedAt } = parseRecord(record);
+    const runDay = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Europe/London', year: 'numeric', month: '2-digit', day: '2-digit',
+    }).format(new Date(observedAt));
+    return `venueId=${venue.venueRef} runDay=${runDay} venueName=${JSON.stringify(venue.name)}`;
+  } catch {
+    return 'venueId=unknown runDay=unknown';
+  }
+}
+
 export async function prepareRecord(
   record: SQSRecord,
   dependencies: PrepareDependencies,

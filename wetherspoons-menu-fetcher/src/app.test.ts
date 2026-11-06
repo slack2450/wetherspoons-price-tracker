@@ -112,7 +112,7 @@ describe('menu fetcher', () => {
     await handle({ Records: [finalAttempt] } as SQSEvent, dependencies);
 
     expect(error).toHaveBeenCalledWith(
-      'MENU_RECORD_FAILED messageId=failure attempts=5',
+      'MENU_RECORD_FAILED messageId=failure attempts=5 venueId=1234 runDay=2026-08-12 venueName="Test Pub"',
       expect.any(Error),
     );
     error.mockRestore();

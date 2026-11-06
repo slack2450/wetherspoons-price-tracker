@@ -3,7 +3,7 @@
 import { InfluxDB, WriteApi } from '@influxdata/influxdb-client';
 import { SQSBatchItemFailure, SQSBatchResponse, SQSEvent, SQSRecord } from 'aws-lambda';
 import { getDrinks } from 'wetherspoons-api';
-import { PrepareDependencies, prepareRecord } from './menu-record';
+import { failureContext, PrepareDependencies, prepareRecord } from './menu-record';
 const SERVER_UPSTREAM_DEADLINE_MS = 25_000;
 
 export interface Dependencies extends PrepareDependencies {
@@ -98,7 +98,7 @@ export async function handle(
     const maxReceiveCount = Number(process.env.MAX_RECEIVE_COUNT ?? 5);
     if (receiveCount >= maxReceiveCount) {
       console.error(
-        `MENU_RECORD_FAILED messageId=${record.messageId} attempts=${receiveCount}`,
+        `MENU_RECORD_FAILED messageId=${record.messageId} attempts=${receiveCount} ${failureContext(record)}`,
         error,
       );
     } else {
