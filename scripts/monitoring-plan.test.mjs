@@ -6,7 +6,9 @@ const plan = (address, actions, before = {}, after = {}) => ({ resource_changes:
 const collector = 'module.wetherspoons_menu_fetcher.aws_lambda_function.wetherspoons_menu_fetcher';
 
 test('allows collector code and monitor creation', () => {
-  assert.equal(validatePlan(plan(collector, ['update'], { source_code_hash: 'old' }, { source_code_hash: 'new' }), 'collector').length, 1);
+  assert.equal(validatePlan(plan(collector, ['update'],
+    { source_code_hash: 'old', source_code_size: 100, last_modified: 'before' },
+    { source_code_hash: 'new' }), 'collector').length, 1);
   assert.equal(validatePlan(plan('aws_lambda_function.pub_failure_monitor', ['create']), 'monitor').length, 1);
 });
 test('rejects queue changes and deletes even when targeted through dependencies', () => {

@@ -35,7 +35,10 @@ export function validatePlan(plan, phase) {
     if (resource.address.endsWith('aws_lambda_function.wetherspoons_menu_fetcher')) {
       // Logging/library code may change; environment, concurrency, runtime,
       // permissions, queues and publisher configuration must stay untouched.
-      const codeFields = new Set(['source_code_hash', 'last_modified', 'version', 'qualified_arn', 'qualified_invoke_arn']);
+      const codeFields = new Set([
+        'source_code_hash', 'code_sha256', 'source_code_size', 'last_modified',
+        'version', 'qualified_arn', 'qualified_invoke_arn', 'signing_job_arn', 'signing_profile_version_arn',
+      ]);
       for (const key of new Set([...Object.keys(before ?? {}), ...Object.keys(after ?? {})])) {
         if (!codeFields.has(key) && JSON.stringify(before?.[key]) !== JSON.stringify(after?.[key])) {
           throw new Error(`Unexpected collector configuration change: ${key}`);
