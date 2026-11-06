@@ -46,6 +46,20 @@ function parseRecord(record: SQSRecord): RunMessage {
   };
 }
 
+// Attribute retries to the original collection day, even if they finish after
+// midnight. Never let malformed input hide the original processing failure.
+export function failureContext(record: SQSRecord): string {
+  try {
+    const { venue, observedAt, runId } = parseRecord(record);
+    const runDay = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Europe/London', year: 'numeric', month: '2-digit', day: '2-digit',
+    }).format(new Date(observedAt));
+    return `venueId=${venue.venueRef} runDay=${runDay} venueName=${JSON.stringify(venue.name)} observedAt=${observedAt} runId=${JSON.stringify(runId)}`;
+  } catch {
+    return 'venueId=unknown runDay=unknown';
+  }
+}
+
 export async function prepareRecord(
   record: SQSRecord,
   dependencies: PrepareDependencies,
@@ -53,8 +67,8 @@ export async function prepareRecord(
   const { runId, observedAt, venue } = parseRecord(record);
   const venueId = venue.venueRef.toString();
   const result = await dependencies.getDrinks(venue);
-  if ((result as { partial?: boolean }).partial) {
-    throw new Error(`Refusing to persist a partial menu for venue ${venueId}`);
+  if (result.status === 'available' && result.partial) {
+    throw new AggregateError(result.failures ?? [], `Refusing to persist a partial menu for venue ${venueId}`);
   }
 
   if (result.status === 'unavailable') {

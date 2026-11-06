@@ -2,6 +2,11 @@ name: Deploy production
 
 on:
   workflow_dispatch:
+    inputs:
+      monitoring_only:
+        description: 'Deploy pub alert policy and compatible collector diagnostics without pausing collection'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -64,6 +69,7 @@ jobs:
         terraform validate
 
     - name: Pause new publisher invocations
+      if: ${{ !inputs.monitoring_only }}
       id: pause_publisher
       run: |
         aws lambda put-function-concurrency \
@@ -72,40 +78,49 @@ jobs:
           --reserved-concurrent-executions 0
 
     - name: Disable collector schedule
+      if: ${{ !inputs.monitoring_only }}
       run: |
         terraform plan -input=false -out=quiesce.tfplan \
           -target=module.wetherspoons_pub_fetcher.aws_scheduler_schedule.operational_hours
         terraform apply -auto-approve -input=false quiesce.tfplan
 
     - name: Wait for the old collectors to become quiescent
+      if: ${{ !inputs.monitoring_only }}
       env:
         QUIESCENCE_PUBLISHER_WAIT_SECONDS: 125
       run: scripts/verify-quiescence.sh
 
     - name: Plan complete deployment while publisher is paused
+      if: ${{ !inputs.monitoring_only }}
       run: terraform plan -input=false -out=deploy.tfplan
 
     - name: Apply exact deployment plan
+      if: ${{ !inputs.monitoring_only }}
       run: terraform apply -auto-approve -input=false deploy.tfplan
 
     - name: Release publisher on the new code
+      if: ${{ !inputs.monitoring_only }}
       run: |
         aws lambda delete-function-concurrency \
           --region eu-west-2 \
           --function-name wetherspoons-pub-fetcher
 
     - name: Drain any deferred publisher invocation
+      if: ${{ !inputs.monitoring_only }}
       env:
         QUIESCENCE_PUBLISHER_WAIT_SECONDS: 0
       run: scripts/verify-quiescence.sh
 
     - name: Smoke-test real Influx collector
+      if: ${{ !inputs.monitoring_only }}
       run: scripts/smoke-collector.sh
 
     - name: Smoke-test real deployed API
+      if: ${{ !inputs.monitoring_only }}
       run: DIRECT_API_BASE="$(terraform output -raw execute_api_endpoint)" node scripts/smoke-deployed-api.mjs
 
     - name: Re-enable collector schedule only after successful smokes
+      if: ${{ !inputs.monitoring_only }}
       env:
         TF_VAR_collector_schedule_state: 'ENABLED'
         TF_VAR_pub_fetcher_reserved_concurrency: '-1'
@@ -118,6 +133,10 @@ jobs:
           --name wetherspoons-operational-hours \
           --query State \
           --output text)" = "ENABLED"
+
+    - name: Deploy and verify pub alert policy and diagnostics
+      if: ${{ inputs.monitoring_only }}
+      run: scripts/deploy-monitoring.sh
 
     - name: Leave a failed deployment safely paused
       if: ${{ failure() && steps.pause_publisher.outcome == 'success' }}

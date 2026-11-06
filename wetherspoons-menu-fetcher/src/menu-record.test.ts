@@ -2,6 +2,25 @@ import { Point } from '@influxdata/influxdb-client';
 import { describe, expect, it, vi } from 'vitest';
 import { processRecord } from './app';
 import { record, unavailableDependencies, venue } from './test-fixtures';
+import { failureContext } from './menu-record';
+
+describe('failure attribution', () => {
+  it('uses the original collection day in London during British Summer Time', () => {
+    const input = record('late');
+    const notification = JSON.parse(input.body);
+    const message = JSON.parse(notification.Message);
+    message.observedAt = '2026-08-12T23:30:00.000Z';
+    notification.Message = JSON.stringify(message);
+    input.body = JSON.stringify(notification);
+    expect(failureContext(input)).toContain('runDay=2026-08-13');
+  });
+
+  it('preserves unknown identity for malformed records without throwing', () => {
+    const input = record('broken');
+    input.body = 'not JSON';
+    expect(failureContext(input)).toBe('venueId=unknown runDay=unknown');
+  });
+});
 
 describe('menu record processing', () => {
   it('records a legitimate unavailable menu without opening an Influx writer', async () => {

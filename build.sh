@@ -84,6 +84,20 @@ fi
 node --test scripts/*.test.mjs
 scripts/package-lambda.sh --self-test
 
+# The monitor uses the Python runtime's boto3 and has no third-party packages.
+python3 -m unittest discover -s pub-failure-monitor -p 'test_*.py'
+mkdir -p pub-failure-monitor/dist
+python3 - <<'PY'
+from pathlib import Path
+from zipfile import ZipFile, ZipInfo, ZIP_DEFLATED
+source = Path('pub-failure-monitor/monitor.py')
+with ZipFile(source.parent / 'dist/index.zip', 'w') as archive:
+    entry = ZipInfo('monitor.py', date_time=(2026, 1, 1, 0, 0, 0))
+    entry.compress_type = ZIP_DEFLATED
+    entry.external_attr = 0o644 << 16
+    archive.writestr(entry, source.read_bytes())
+PY
+
 # wetherspoons-pub-fetcher
 cd ./wetherspoons-pub-fetcher
 npm ci
