@@ -20,6 +20,7 @@ export const targets = {
     'aws_cloudwatch_metric_alarm.source_queue_too_old',
     'module.wetherspoons_menu_fetcher.aws_cloudwatch_metric_alarm.menu_record_failures',
     'module.wetherspoons_menu_fetcher.aws_lambda_function.wetherspoons_menu_fetcher',
+    'module.wetherspoons_pub_fetcher.aws_lambda_function.wetherspoons_pub_fetcher',
   ],
 };
 
@@ -32,9 +33,10 @@ export function validatePlan(plan, phase) {
     const allowed = targets[phase].some(address => resource.address === address || resource.address.startsWith(`${address}[`));
     if (!allowed || actions.includes('delete')) throw new Error(`Out-of-scope/destructive change: ${resource.address}`);
     if (phase === 'collector' && actions.join(',') !== 'update') throw new Error(`Expected an existing resource: ${resource.address}`);
-    if (resource.address.endsWith('aws_lambda_function.wetherspoons_menu_fetcher')) {
-      // Logging/library code may change; environment, concurrency, runtime,
-      // permissions, queues and publisher configuration must stay untouched.
+    if (resource.address.endsWith('aws_lambda_function.wetherspoons_menu_fetcher')
+      || resource.address.endsWith('aws_lambda_function.wetherspoons_pub_fetcher')) {
+      // Compatible library/code updates only: preserve environment, concurrency,
+      // runtime, permissions, queues and schedules for both fetchers.
       const codeFields = new Set([
         'source_code_hash', 'code_sha256', 'source_code_size', 'last_modified',
         'version', 'qualified_arn', 'qualified_invoke_arn', 'signing_job_arn', 'signing_profile_version_arn',

@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       monitoring_only:
-        description: 'Deploy pub alert policy and compatible collector diagnostics without pausing collection'
+        description: 'Deploy pub alert policy and compatible fetcher code updates without pausing collection'
         type: boolean
         default: false
 
@@ -64,7 +64,7 @@ jobs:
 
     - name: Initialize and validate Terraform
       run: |
-        terraform init
+        scripts/terraform-init.sh
         terraform fmt -check -recursive
         terraform validate
 
@@ -136,6 +136,9 @@ jobs:
 
     - name: Deploy and verify pub alert policy and diagnostics
       if: ${{ inputs.monitoring_only }}
+      env:
+        TF_VAR_collector_schedule_state: 'ENABLED'
+        TF_VAR_pub_fetcher_reserved_concurrency: '-1'
       run: scripts/deploy-monitoring.sh
 
     - name: Leave a failed deployment safely paused

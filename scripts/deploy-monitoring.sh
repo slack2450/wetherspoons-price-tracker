@@ -3,7 +3,6 @@ set -euo pipefail
 
 readonly AWS_REGION=eu-west-2
 readonly MONITOR=wetherspoons-pub-failure-monitor
-readonly COLLECTOR=wetherspoons-menu-fetcher
 readonly SCHEDULE=wetherspoons-operational-hours
 deployment_tmp="$(mktemp -d)"
 trap 'rm -rf -- "$deployment_tmp"' EXIT
@@ -32,10 +31,13 @@ jq -e '.recurringPubs | type == "array"' "$deployment_tmp/monitor-result.json"
 cat "$deployment_tmp/monitor-result.json"
 
 apply_phase collector
-aws lambda wait function-updated-v2 --region "$AWS_REGION" --function-name "$COLLECTOR"
-expected_hash="$(openssl dgst -sha256 -binary wetherspoons-menu-fetcher/dist/index.zip | openssl base64 -A)"
-actual_hash="$(aws lambda get-function-configuration --region "$AWS_REGION" --function-name "$COLLECTOR" --query CodeSha256 --output text)"
-test "$actual_hash" = "$expected_hash"
+for function_name in wetherspoons-menu-fetcher wetherspoons-pub-fetcher; do
+  aws lambda wait function-updated-v2 --region "$AWS_REGION" --function-name "$function_name"
+  expected_hash="$(openssl dgst -sha256 -binary "$function_name/dist/index.zip" | openssl base64 -A)"
+  actual_hash="$(aws lambda get-function-configuration --region "$AWS_REGION" --function-name "$function_name" --query CodeSha256 --output text)"
+  test "$actual_hash" = "$expected_hash"
+  echo "FETCHER_CODE_VERIFIED function=$function_name"
+done
 test "$(aws scheduler get-schedule --region "$AWS_REGION" --name "$SCHEDULE" --query State --output text)" = "$schedule_before"
 
 aws cloudwatch describe-alarms --region "$AWS_REGION" \
@@ -44,4 +46,7 @@ aws cloudwatch describe-alarms --region "$AWS_REGION" \
 jq -e '[.MetricAlarms[] | select(.AlarmName == "wetherspoons-source-queue-too-old")][0] | .DatapointsToAlarm == 2 and .EvaluationPeriods == 3 and (.Metrics | any(.Expression == "IF(age > 1800 AND (visible + inflight) >= 10, 1, 0)"))' "$deployment_tmp/alarms.json"
 jq -e '[.MetricAlarms[] | select(.AlarmName == "menu-record-failures")][0] | .MetricName == "FailedPubsLastHour" and .Threshold == 9' "$deployment_tmp/alarms.json"
 jq -e '[.MetricAlarms[] | select(.AlarmName == "wetherspoons-dead-letter-queue-not-empty")][0] | .AlarmActions == []' "$deployment_tmp/alarms.json"
-echo "MONITORING_DEPLOY_OK collector_code=verified monitor=invoked schedule=$schedule_before"
+scripts/smoke-affected-pubs.sh
+aws cloudwatch describe-alarms --region "$AWS_REGION" \
+  --query 'MetricAlarms[].{name:AlarmName,state:StateValue,reason:StateReason}' --output json
+echo "MONITORING_DEPLOY_OK collector_code=verified publisher_code=verified monitor=invoked schedule=$schedule_before"

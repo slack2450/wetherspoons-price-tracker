@@ -32,6 +32,6 @@ jobs:
       run: ./build.sh
     - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4
     - name: Initialize providers without remote state
-      run: terraform init -backend=false
+      run: scripts/terraform-init.sh -backend=false
     - run: terraform fmt -check -recursive
     - run: terraform validate
