@@ -12,7 +12,7 @@
   "license": "UNLICENSED",
   "dependencies": {
     "@influxdata/influxdb-client": "^1.35.0",
-    "wetherspoons-api": "git+https://github.com/slack2450/wetherspoons-api.git#3ae96d9347cfd571f3a2fe3933ce41f2a09d8dce"
+    "wetherspoons-api": "3.0.2"
   },
   "devDependencies": {
     "@babel/core": "^7.28.4",
