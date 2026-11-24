@@ -68,12 +68,7 @@ resource "aws_cloudfront_response_headers_policy" "wetherspoons_api_cors" {
     }
 
     access_control_allow_origins {
-      items = [
-        "http://localhost:3000",
-        "http://spoons.cheap",
-        "https://spoons.cheap",
-        "https://www.spoons.cheap",
-      ]
+      items = ["*"]
     }
   }
 }

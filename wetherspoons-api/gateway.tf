@@ -9,12 +9,7 @@ resource "aws_apigatewayv2_api" "wetherspoons_api" {
 
   cors_configuration {
     allow_methods = ["GET"]
-    allow_origins = [
-      "http://localhost",
-      "http://localhost:3000",
-      "https://spoons.cheap",
-      "https://www.spoons.cheap",
-    ]
+    allow_origins = ["*"]
   }
 }
 
